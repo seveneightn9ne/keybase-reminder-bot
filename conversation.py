@@ -38,7 +38,7 @@ class Conversation(object):
             conv.store()
             return conv
         conv.last_active_time = datetime.fromtimestamp(row[0], tz=pytz.utc)
-        print "Loaded conv last active", conv.last_active_time
+        #print "Loaded conv last active", conv.last_active_time
         conv.context = row[1]
         if row[2]:
             conv.reminder = Reminder.lookup(row[2], db)
