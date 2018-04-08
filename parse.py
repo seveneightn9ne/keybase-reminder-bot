@@ -93,7 +93,8 @@ def try_parse_stfu(text):
             or text == "stfu" \
             or text == "shut up" \
             or text == "go away" \
-            or text == "leave me alone"
+            or text == "leave me alone" \
+            or text == "never"
 
 def parse_message(message, conv):
     reminder = try_parse_reminder(message)

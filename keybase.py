@@ -33,6 +33,13 @@ class Message(object):
         self.db = db
         self.user_memoized = None
 
+    @classmethod
+    def inject(cls, text, author, channel, db):
+        return Message({"msg": {
+            "content": {"text": {"body": text}},
+            "sender": {"username": author},
+            "channel": {"name": channel}}}, db)
+
     def user(self):
         if not self.user_memoized:
             u = User.lookup(self.author, self.db)
@@ -60,3 +67,10 @@ def call(method, params=None):
 def send(channel, text):
     call("send", {"options": {"channel": {"name": channel}, "message": {"body": text}}})
     return True
+
+def status():
+    proc = subprocess.Popen(['keybase','status', '-j'], stdout=PIPE)
+    out, err = proc.communicate()
+    return json.loads(out)
+
+

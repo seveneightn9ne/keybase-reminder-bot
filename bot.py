@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse, configparser, os, pytz, sqlite3, subprocess, sys, time, traceback
+import argparse, configparser, os, pytz, signal, sqlite3, subprocess, sys, time, traceback
 from datetime import datetime
 
 import conversation, keybase, parse
@@ -8,23 +8,32 @@ from conversation import Conversation
 
 HELP_WHEN = "Sorry, I didn't understand. When should I set the reminder for?" \
         " You can say something like \"tomorrow at 10am\" or \"in 30 minutes\"."
-HELP_TIMEZONE = "Sorry, I didn't understand. What's your timezone?" \
-        " It can be something like \"ET\", \"PT\", or \"GMT\"."
+HELP_TZ = "Sorry, I couldn't understand your timezone. It can be something like \"US/Pacific\"" \
+        " or \"GMT\". If you're stuck, I can use any of the timezones in this list:" \
+        " https://stackoverflow.com/questions/13866926/python-pytz-list-of-timezones."\
+        " Be sure to get the capitalization right!"
 UNKNOWN = "Sorry, I didn't understand that message."
 PROMPT_HELP = "Hey there, I didn't understand that." \
         " Just say \"help\" to see what sort of things I understand."
 #HELLO = lambda(name): "Hi " + name + "! To set a reminder just"
 
-def setup():
-    try:
-        subprocess.check_call(['keybase', 'login', username])
-    except subprocess.CalledProcessError:
-        print >> sys.stderr, "FATAL: Error during call to `keybase login " + username + "`"
+def setup(config):
+    status = keybase.status()
+    if not status["LoggedIn"]:
+        try:
+            subprocess.check_call(['keybase', 'login', config.username])
+        except subprocess.CalledProcessError:
+            print >> sys.stderr, "FATAL: Error during call to `keybase login " \
+                    + config.username + "`"
+            sys.exit(1)
+    elif not status["Username"] == config.username:
+        print >> sys.stderr, "FATAL: There's another user logged in to Keybase already." \
+                " You'll need to log them out first."
         sys.exit(1)
     try:
-        c = sqlite3.connect(db)
+        c = sqlite3.connect(config.db)
     except sqlite3.OperationalError as e:
-        print >> sys.stderr, "FATAL: Error connecting to " + db + ": " + e.message
+        print >> sys.stderr, "FATAL: Error connecting to " + config.db + ": " + e.message
         sys.exit(1)
     c.execute('''create table if not exists reminders (
         reminder_time int,
@@ -47,12 +56,11 @@ def setup():
         debug boolean not null)''')
     c.execute('create index if not exists idx_conversation_channel on conversations(channel)')
     c.commit()
-    print "ReminderBot is running..."
 
 # Returns True iff I interacted with the user.
-def process_message(message, conv):
+def process_message_inner(config, message, conv):
     if not message.is_private_channel() \
-            and not username in message.text \
+            and not config.username in message.text \
             and conv.context == conversation.CTX_NONE:
         print "Ignoring message not for me"
         return False
@@ -81,6 +89,8 @@ def process_message(message, conv):
         return keybase.send(conv.channel, HELP)
     elif msg_type == parse.MSG_TIMEZONE:
         message.user().set_timezone(data)
+        if conv.context == conversation.CTX_WHEN:
+            return keybase.send(conv.channel, "Got it! When do you want to be reminded?")
         return keybase.send(conv.channel, "Got it!")
     elif msg_type == parse.MSG_WHEN:
         conv.reminder.set_time(data)
@@ -109,7 +119,11 @@ def process_message(message, conv):
     print msg_type, data
     assert False
 
-def process_new_messages():
+def process_message(config, message, conv):
+    if process_message_inner(config, message, conv):
+        conv.set_active()
+
+def process_new_messages(config):
     results = keybase.call("list")
     all_convs = results["conversations"]
     unread_convs = filter(lambda conv: conv["unread"], all_convs)
@@ -118,7 +132,7 @@ def process_new_messages():
     for conv_json in unread_convs:
         channel = conv_json["channel"]["name"]
         #print channel + " is unread"
-        conv = Conversation.lookup(channel, db)
+        conv = Conversation.lookup(channel, config.db)
         #print conv.channel, " loaded"
         params = {"options": {
                 "channel": {"name": channel},
@@ -128,16 +142,30 @@ def process_new_messages():
         for message in response["messages"]:
             # TODO consider processing all messages together
             try:
-                if process_message(keybase.Message(message, db), conv):
-                    conv.set_active()
+                process_message(config, keybase.Message(message, config.db), conv)
             except:
-                keybase.send(channel, "Ugh! I crashed! You can complain to @jessk.")
+                keybase.send(channel, "Ugh! I crashed! You can complain to @" + config.owner + ".")
                 conv.set_context(conversation.CTX_NONE)
                 raise
 
-def send_reminders():
+def send_reminders(config):
     # TODO
     pass
+
+class Config(object):
+    def __init__(self, db, username, owner):
+        self.db = db
+        self.username = username
+        self.owner = owner
+
+    @classmethod
+    def fromFile(cls, configFile):
+        config = configparser.ConfigParser()
+        config.read(configFile)
+        db = config['database']['file']
+        username = config['keybase']['username']
+        owner = config['keybase']['owner']
+        return Config(db, username, owner)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Beep boop.')
@@ -147,36 +175,46 @@ if __name__ == "__main__":
                         action='store_true')
     args = parser.parse_args()
 
-    config = configparser.ConfigParser()
-    config.read(args.config)
-
-    global db
-    db = config['database']['file']
+    config = Config.fromFile(args.config)
 
     if args.wipedb:
-        os.remove(db)
+        os.remove(config.db)
 
-    global username
-    username = config['keybase']['username']
+    setup(config)
+    print "ReminderBot is running..."
 
-    setup()
+    running = True
+    def signal_handler(signal, frame):
+        global running
+        running = False
 
-    # TODO handle sigterm
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
-    while True:
+    while running:
         try:
-            process_new_messages()
+            process_new_messages(config)
         except:
             exc_type, value, tb = sys.exc_info()
             traceback.print_tb(tb)
             print >> sys.stderr, str(exc_type) + ": " + str(value)
 
+        if not running:
+            break
+
         try:
-            send_reminders()
+            send_reminders(config)
         except:
             exc_type, value, tb = sys.exc_info()
             traceback.print_tb(tb)
-            print >> sys.stderr, exc_type + ": " + exc_value
+            print >> sys.stderr, str(exc_type) + ": " + str(value)
+
+        if not running:
+            break
 
         time.sleep(1)
+
+    print "ReminderBot shut down gracefully."
+
+
 

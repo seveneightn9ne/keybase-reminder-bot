@@ -68,10 +68,12 @@ class Conversation(object):
 
     def set_active(self):
         self.last_active_time = datetime.now(pytz.utc)
-        print "Setting last active time!", self.last_active_time
+        #print "Setting last active time!", self.last_active_time
         with sqlite3.connect(self.db) as c:
-            c.execute('update conversations set last_active_time=? where channel=?',
+            cur = c.cursor()
+            cur.execute('update conversations set last_active_time=? where channel=?',
                     (to_ts(self.last_active_time), self.channel))
+            assert cur.rowcount == 1
 
     def store(self):
         active_ts = to_ts(self.last_active_time) if self.last_active_time else 0
