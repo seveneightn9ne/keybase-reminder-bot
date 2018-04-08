@@ -53,13 +53,6 @@ class TestBot(unittest.TestCase):
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject("remind me to foo tomorrow", TEST_USER, TEST_CHANNEL, DB)
         bot.process_message(self.config, message, conv)
-        call_args = mockKeybaseSend.call_args[0]
-        #assert call_args[1].startswith("Ok! I'll remind you to foo on")
-
-        #r = reminders.Reminder('f', self.now, 'f', 'f', DB)
-        #print r.human_time()
-
-
         mockKeybaseSend.assert_called_with(TEST_CHANNEL,
             "Ok! I'll remind you to foo on Monday at 09:02 PM EDT")
 
