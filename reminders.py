@@ -1,7 +1,7 @@
 # Reminders
 
 import random, sqlite3, time
-from datetime import datetime
+import datetime
 from user import User
 from pytz import timezone
 import pytz
@@ -15,7 +15,7 @@ class Reminder(object):
     def __init__(self, body, time, username, channel, db):
         # time is a datetime in utc
         self.reminder_time = time
-        self.created_time = datetime.now(pytz.utc)
+        self.created_time = datetime.datetime.now(pytz.utc)
         self.body = body
         self.user = User.lookup(username, db)
         self.channel = channel
@@ -34,9 +34,9 @@ class Reminder(object):
                 created_time from reminders where rowid=?''', (rowid,))
             row = cur.fetchone()
         assert row is not None
-        reminder_time = datetime.fromtimestamp(row[1], tz=pytz.utc) if row[1] else None
+        reminder_time = datetime.datetime.fromtimestamp(row[1], tz=pytz.utc) if row[1] else None
         reminder = Reminder(row[0], reminder_time, row[2], row[3], db)
-        reminder.created_time = datetime.fromtimestamp(row[4], tz=pytz.utc)
+        reminder.created_time = datetime.datetime.fromtimestamp(row[4], tz=pytz.utc)
         reminder.id = rowid
         return reminder
 
@@ -73,12 +73,12 @@ class Reminder(object):
 
     def human_time(self):
         assert self.reminder_time is not None
-        now = datetime.now(pytz.utc)
+        now = datetime.datetime.now(pytz.utc)
         delta = self.reminder_time - now
-        # Default timezone to ET
-        tz = timezone(self.user.timezone) if self.user.timezone else timezone('ET')
-        needs_date = delta.seconds > 60 * 60 * 16 # today-ish
-        needs_day = needs_date and delta.days < 7
+        # Default timezone to US/Eastern TODO magic string used in a couple places
+        tz = timezone(self.user.timezone) if self.user.timezone else timezone('US/Eastern')
+        needs_date = delta.total_seconds() > 60 * 60 * 16 # today-ish
+        needs_day = needs_date and delta.days > 7
         needs_year = needs_day and self.reminder_time.year != now.year
         fmt = ""
         if needs_date:
@@ -95,5 +95,5 @@ class Reminder(object):
         return self.reminder_time.replace(tzinfo=pytz.utc).astimezone(tz).strftime(fmt)
 
     def confirmation(self):
-        return random.choice(OK) + " I'll remind you " + self.body + " " + self.human_time()
+        return random.choice(OK) + " I'll remind you to " + self.body + " " + self.human_time()
 

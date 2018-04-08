@@ -16,7 +16,7 @@ def timezone_diff(old, new):
     old_time = ref.replace(tzinfo=timezone(old))
     new_time = ref.replace(tzinfo=timezone(new))
     delta = new_time - old_time
-    seconds = delta.seconds
+    seconds = delta.total_seconds()
     if delta.days == -1:
         seconds = -1 * ((60*60*24) - seconds)
     return seconds
@@ -80,3 +80,9 @@ class User(object):
             'timezone': self.timezone,
             'has_seen_help': self.has_seen_help,
         })
+
+    # Delete the user AND all their reminders
+    def delete(self):
+        with sqlite3.connect(self.db) as c:
+            c.execute('delete from users where username=?', (self.name,))
+            c.execute('delete from reminders where user=?', (self.name,))

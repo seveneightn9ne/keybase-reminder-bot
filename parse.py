@@ -1,6 +1,6 @@
 # Parsing messages
 
-import dateparser, pytz
+import dateparser, datetime, pytz
 
 import conversation
 from reminders import Reminder
@@ -20,17 +20,21 @@ MSG_UNKNOWN_TZ = 6
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):
+    # include RELATIVE_BASE explicitly so we can mock datetime.now in tests
+    local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
+    relative_base = datetime.datetime.now(tz=pytz.timezone(local_timezone_str))
     parse_date_settings = {
             'PREFER_DATES_FROM': 'future',
             'PREFER_DAY_OF_MONTH': 'first',
             'TO_TIMEZONE': 'UTC',
-            'TIMEZONE': user.timezone,
-            'RETURN_AS_TIMEZONE_AWARE': True}
-    return  dateparser.parse(when, settings=parse_date_settings)
+            'TIMEZONE': local_timezone_str,
+            'RETURN_AS_TIMEZONE_AWARE': True,
+            'RELATIVE_BASE': relative_base}
+    return dateparser.parse(when, settings=parse_date_settings)
 
 def try_parse_reminder(message):
     start_phrases = ["remind me to ", "reminder to "]
-    time_phrases = [" every ", " today ", " tomorrow ", " next ", " at ", " on "]
+    time_phrases = [" every ", " today", " tomorrow", " next ", " at ", " on "]
     for start_phrase in start_phrases:
         if start_phrase in message.text.lower():
             rest = message.text.split(start_phrase)[-1]
@@ -43,10 +47,10 @@ def try_parse_reminder(message):
             parts = rest.split(time_phrase)
             if len(parts) == 2:
                 reminder_text = parts[0]
-                when = (time_phrase + parts[1]).trim()
+                when = (time_phrase + parts[1]).strip()
             else:
                 reminder_text = parts[:-1].join(time_phrase)
-                when = (time_phrase + parts[-1]).trim()
+                when = (time_phrase + parts[-1]).strip()
             break
     else:
         reminder_text = rest
@@ -62,6 +66,7 @@ def try_parse_reminder(message):
         return reminder # will ask for when
 
     reminder.reminder_time = try_parse_when(when, user)
+    #print "Reminder time parsed as", reminder.reminder_time
 
     return reminder
 

@@ -1,14 +1,16 @@
-import sqlite3, unittest
+import datetime, pytz, sqlite3, unittest
 from mock import patch
 
-import bot, keybase
+import bot, conversation, keybase, reminders
 from conversation import Conversation
+from user import User
 
 DB = 'test.db' # Why doesn't :memory: work?
 TEST_BOT = '__testbot__'
 TEST_USER = '__testuser__'
 TEST_OWNER = '__testowner__'
 TEST_CHANNEL = TEST_USER + "," + TEST_BOT
+NOW_TS = 1523235748.0 # April 8 2018, 21:02:28 EDT. April 9 2018, 01:02:28 UTC.
 
 class TestBot(unittest.TestCase):
 
@@ -17,7 +19,14 @@ class TestBot(unittest.TestCase):
     def setUp(self, mockKeybaseStatus, mockCheckCall):
         mockKeybaseStatus.return_value = {"LoggedIn": True, "Username": TEST_BOT}
         self.config = bot.Config(DB, TEST_BOT, TEST_OWNER)
+        self.now = datetime.datetime.fromtimestamp(NOW_TS, tz=pytz.utc)
         bot.setup(self.config)
+
+    def tearDown(self):
+        conv = Conversation.lookup(TEST_CHANNEL, DB)
+        conv.delete()
+        user = User.lookup(TEST_USER, DB)
+        user.delete()
 
     @patch('keybase.send')
     def test_recent_message(self, mockKeybaseSend):
@@ -34,10 +43,25 @@ class TestBot(unittest.TestCase):
         mockKeybaseSend.assert_called_with(TEST_CHANNEL, bot.UNKNOWN)
 
     @patch('keybase.send')
-    def test_set_reminder(self, mockKeybaseSend):
+    @patch('random.choice')
+    @patch('datetime.datetime')
+    def test_set_reminder(self, mockDatetime, mockRandomChoice, mockKeybaseSend):
         mockKeybaseSend.return_value = True
+        mockRandomChoice.side_effect = lambda i: i[0]
+        mockDatetime.now.return_value = self.now
+
+        conv = Conversation.lookup(TEST_CHANNEL, DB)
+        message = keybase.Message.inject("remind me to foo tomorrow", TEST_USER, TEST_CHANNEL, DB)
+        bot.process_message(self.config, message, conv)
+        call_args = mockKeybaseSend.call_args[0]
+        #assert call_args[1].startswith("Ok! I'll remind you to foo on")
+
+        #r = reminders.Reminder('f', self.now, 'f', 'f', DB)
+        #print r.human_time()
 
 
+        mockKeybaseSend.assert_called_with(TEST_CHANNEL,
+            "Ok! I'll remind you to foo on Monday at 09:02 PM EDT")
 
 if __name__ == '__main__':
     unittest.main()

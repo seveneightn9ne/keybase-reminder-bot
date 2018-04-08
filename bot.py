@@ -104,7 +104,7 @@ def process_message_inner(config, message, conv):
             return keybase.send(conv.channel, HELP_WHEN)
         else: # CTX_NONE
             if conv.last_active_time and \
-                (datetime.now(pytz.utc) - conv.last_active_time).seconds < 60 * 30:
+                (datetime.now(pytz.utc) - conv.last_active_time).total_seconds() < 60 * 30:
                 # we're in the middle of a conversation
                 return keybase.send(conv.channel, UNKNOWN)
             if not message.is_private_channel():

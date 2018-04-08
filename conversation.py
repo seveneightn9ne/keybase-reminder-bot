@@ -66,8 +66,10 @@ class Conversation(object):
             self.reminder.delete()
         self.set_context(CTX_NONE)
 
-    def set_active(self):
-        self.last_active_time = datetime.now(pytz.utc)
+    def set_active(self, when=None):
+        if when is None:
+            when = datetime.now(pytz.utc)
+        self.last_active_time = when
         #print "Setting last active time!", self.last_active_time
         with sqlite3.connect(self.db) as c:
             cur = c.cursor()
@@ -77,7 +79,7 @@ class Conversation(object):
 
     def store(self):
         active_ts = to_ts(self.last_active_time) if self.last_active_time else 0
-        print "storing new conv " + self.channel
+        #print "storing new conv " + self.channel
         with sqlite3.connect(self.db) as c:
             c.execute('''insert into conversations (
                 channel,
@@ -90,3 +92,9 @@ class Conversation(object):
                 self.context,
                 self.reminder.id if self.reminder else None,
                 self.debug))
+
+    # Delete the conversation from the database, doesn't delete related reminders
+    # TODO make sure a reminder can be sent to a conversation that isn't in the DB
+    def delete(self):
+        with sqlite3.connect(self.db) as c:
+            c.execute('delete from conversations where channel=?', (self.channel,))
