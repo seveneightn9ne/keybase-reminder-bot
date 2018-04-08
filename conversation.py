@@ -19,7 +19,7 @@ class Conversation(object):
         self.channel = channel
         self.debug = False
         self.context = 0
-        self.reminder = None
+        self.reminder_id = None
         self.last_active_time = None
         self.db = db
 
@@ -40,30 +40,34 @@ class Conversation(object):
         conv.last_active_time = datetime.fromtimestamp(row[0], tz=pytz.utc)
         #print "Loaded conv last active", conv.last_active_time
         conv.context = row[1]
-        if row[2]:
-            conv.reminder = Reminder.lookup(row[2], db)
+        conv.reminder_id = row[2]
         conv.debug = row[3]
         return conv
 
+    def get_reminder(self):
+        if not self.reminder_id:
+            return None
+        return Reminder.lookup(self.reminder_id, self.db)
+
     def set_context(self, context, reminder=None):
         assert (not reminder) or reminder.id
+        reminder_id = reminder.id if reminder else None
         if context == CTX_NONE:
-            assert reminder == None
+            assert reminder_id == None
         if context == CTX_WHEN:
-            assert reminder != None
+            assert reminder_id != None
 
         self.context = context
-        self.reminder = reminder
+        self.reminder_id = reminder_id
 
-        reminder_id = reminder.id if reminder else None
         with sqlite3.connect(self.db) as c:
             c.execute('''update conversations set
                 context=?, reminder_rowid=? where channel=?''',
                 (context, reminder_id, self.channel))
 
     def clear_context(self):
-        if self.reminder:
-            self.reminder.delete()
+        if self.reminder_id:
+            self.get_reminder().delete()
         self.set_context(CTX_NONE)
 
     def set_active(self, when=None):
@@ -90,7 +94,7 @@ class Conversation(object):
                 self.channel,
                 active_ts,
                 self.context,
-                self.reminder.id if self.reminder else None,
+                self.reminder_id,
                 self.debug))
 
     # Delete the conversation from the database, doesn't delete related reminders

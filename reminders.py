@@ -17,7 +17,7 @@ class Reminder(object):
         self.reminder_time = time
         self.created_time = datetime.datetime.now(pytz.utc)
         self.body = body
-        self.user = User.lookup(username, db)
+        self.username = username
         self.channel = channel
         self.id = None # when it's from the DB
         self.db = db
@@ -39,6 +39,9 @@ class Reminder(object):
         reminder.created_time = datetime.datetime.fromtimestamp(row[4], tz=pytz.utc)
         reminder.id = rowid
         return reminder
+
+    def get_user(self):
+        return User.lookup(self.username, self.db)
 
     def set_time(self, time):
         assert self.reminder_time is None
@@ -67,16 +70,17 @@ class Reminder(object):
                 reminder_ts,
                 created_ts,
                 self.body,
-                self.user.name,
+                self.username,
                 self.channel))
             self.id = cur.lastrowid
 
     def human_time(self):
         assert self.reminder_time is not None
+        user_tz = self.get_user().timezone
         now = datetime.datetime.now(pytz.utc)
         delta = self.reminder_time - now
         # Default timezone to US/Eastern TODO magic string used in a couple places
-        tz = timezone(self.user.timezone) if self.user.timezone else timezone('US/Eastern')
+        tz = timezone(user_tz) if user_tz else timezone('US/Eastern')
         needs_date = delta.total_seconds() > 60 * 60 * 16 # today-ish
         needs_day = needs_date and delta.days > 7
         needs_year = needs_day and self.reminder_time.year != now.year
@@ -88,8 +92,8 @@ class Reminder(object):
             if needs_year:
                 fmt += "%Y " # 2018
         fmt += "at %I:%M %p" # at 10:30 AM
-        if not self.user.timezone:
-            fmt += " %Z" # ET
+        if not user_tz:
+            fmt += " %Z" # EDT or EST
         # TODO maybe this (or something nearby) will throw pytz.exceptions.AmbiguousTimeError
         # near DST transition?
         return self.reminder_time.replace(tzinfo=pytz.utc).astimezone(tz).strftime(fmt)

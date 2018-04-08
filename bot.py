@@ -6,6 +6,7 @@ from datetime import datetime
 import conversation, keybase, parse
 from conversation import Conversation
 
+# Static response messages
 HELP_WHEN = "Sorry, I didn't understand. When should I set the reminder for?" \
         " You can say something like \"tomorrow at 10am\" or \"in 30 minutes\"."
 HELP_TZ = "Sorry, I couldn't understand your timezone. It can be something like \"US/Pacific\"" \
@@ -15,6 +16,13 @@ HELP_TZ = "Sorry, I couldn't understand your timezone. It can be something like 
 UNKNOWN = "Sorry, I didn't understand that message."
 PROMPT_HELP = "Hey there, I didn't understand that." \
         " Just say \"help\" to see what sort of things I understand."
+ASSUME_TZ = "I'm assuming your timezone is US/Eastern." \
+        " If it's not, just tell me something like \"my timezone is US/Pacific\"."
+WHEN = "When do you want to be reminded?"
+ACK = "Got it!"
+ACK_WHEN = ACK + " " + WHEN
+OK = "ok!"
+
 #HELLO = lambda(name): "Hi " + name + "! To set a reminder just"
 
 def setup(config):
@@ -70,31 +78,31 @@ def process_message_inner(config, message, conv):
     msg_type, data = parse.parse_message(message, conv)
     print "Received message parsed as " + str(msg_type)
     if msg_type == parse.MSG_REMINDER and message.user().timezone is None:
-        keybase.send(conv.channel, "I'm assuming your timezone is US/Eastern." \
-                " If it's not, just tell me something like \"my timezone is US/Pacific\".")
+        keybase.send(conv.channel, ASSUME_TZ)
         message.user().set_timezone("US/Eastern")
     if msg_type == parse.MSG_REMINDER:
         reminder = data
         reminder.store()
         if not reminder.reminder_time:
             conv.set_context(conversation.CTX_WHEN, reminder=reminder)
-            return keybase.send(conv.channel, "When do you want to be reminded?")
+            return keybase.send(conv.channel, WHEN)
         else:
             return keybase.send(conv.channel, reminder.confirmation())
     elif msg_type == parse.MSG_STFU:
         conv.clear_context()
-        return keybase.send(conv.channel, "ok!")
+        return keybase.send(conv.channel, OK)
     elif msg_type == parse.MSG_HELP:
         message.user().set_seen_help()
         return keybase.send(conv.channel, HELP)
     elif msg_type == parse.MSG_TIMEZONE:
         message.user().set_timezone(data)
         if conv.context == conversation.CTX_WHEN:
-            return keybase.send(conv.channel, "Got it! When do you want to be reminded?")
-        return keybase.send(conv.channel, "Got it!")
+            return keybase.send(conv.channel, ACK_WHEN)
+        return keybase.send(conv.channel, ACK)
     elif msg_type == parse.MSG_WHEN:
-        conv.reminder.set_time(data)
-        confirmation = conv.reminder.confirmation()
+        reminder = conv.get_reminder()
+        reminder.set_time(data)
+        confirmation = reminder.confirmation()
         conv.set_context(conversation.CTX_NONE)
         return keybase.send(conv.channel, confirmation)
     elif msg_type == parse.MSG_UNKNOWN_TZ:

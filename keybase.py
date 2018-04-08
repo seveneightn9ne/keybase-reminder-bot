@@ -31,7 +31,6 @@ class Message(object):
         self.channel = json["msg"]["channel"]["name"]
         self.json = json
         self.db = db
-        self.user_memoized = None
 
     @classmethod
     def inject(cls, text, author, channel, db):
@@ -41,10 +40,7 @@ class Message(object):
             "channel": {"name": channel}}}, db)
 
     def user(self):
-        if not self.user_memoized:
-            u = User.lookup(self.author, self.db)
-            self.user_memoized = u
-        return self.user_memoized
+        return User.lookup(self.author, self.db)
 
     def is_private_channel(self):
         return self.channel.count(',') == 1

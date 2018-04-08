@@ -72,8 +72,10 @@ class User(object):
             self.save_settings_inner(c)
 
     def save_settings_inner(self, c):
-        c.execute('update users set settings=? where username=?',
+        cur = c.cursor()
+        cur.execute('update users set settings=? where username=?',
                 (self.settings_json(), self.name))
+        assert cur.rowcount == 1
 
     def settings_json(self):
         return json.dumps({
