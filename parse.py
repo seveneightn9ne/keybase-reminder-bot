@@ -1,8 +1,8 @@
 # Parsing messages
 
-import dateparser, datetime, pytz
+import dateparser, pytz
 
-import conversation
+import conversation, util
 from reminders import Reminder
 from user import User
 
@@ -13,6 +13,7 @@ MSG_WHEN = 3
 MSG_TIMEZONE = 4
 MSG_STFU = 5
 MSG_UNKNOWN_TZ = 6
+MSG_LIST = 7
 # TODO MSG_SNOOZE
 # TODO MSG_ACK
 # TODO MSG_GREETING
@@ -20,10 +21,9 @@ MSG_UNKNOWN_TZ = 6
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):
-    # include RELATIVE_BASE explicitly so we can mock datetime.now in tests
+    # include RELATIVE_BASE explicitly so we can mock now in tests
     local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
-    relative_base = datetime.datetime.now(tz=pytz.utc).astimezone(
-            pytz.timezone(local_timezone_str))
+    relative_base = util.now_local(local_timezone_str)
     parse_date_settings = {
             'PREFER_DATES_FROM': 'future',
             'PREFER_DAY_OF_MONTH': 'first',
@@ -31,7 +31,10 @@ def try_parse_when(when, user):
             'TIMEZONE': local_timezone_str,
             'RETURN_AS_TIMEZONE_AWARE': True,
             'RELATIVE_BASE': relative_base}
-    return dateparser.parse(when, settings=parse_date_settings)
+    dt = dateparser.parse(when, settings=parse_date_settings)
+    #if dt:
+    #    print "parsed", when, "to", dt
+    return dt
 
 def try_parse_reminder(message):
     start_phrases = ["remind me to ", "reminder to "]
@@ -85,7 +88,7 @@ def try_parse_timezone(text):
                 if word == "pt" or word == "pacific" or word == "us/pacific":
                     return "US/Pacific", True
                 try:
-                    dateparser.parse("today", settings={"TIMEZONE": word})
+                    pytz.timezone(word)
                     return word, True
                 except pytz.exceptions.UnknownTimeZoneError:
                     pass
@@ -102,6 +105,10 @@ def try_parse_stfu(text):
             or text == "go away" \
             or text == "leave me alone" \
             or text == "never"
+
+def try_parse_list(text):
+    text = text.lower()
+    return "list" in text or ("show" in text and "reminders" in text)
 
 def parse_message(message, conv):
     reminder = try_parse_reminder(message)
@@ -121,6 +128,9 @@ def parse_message(message, conv):
         return (MSG_TIMEZONE, tz)
     if attempted:
         return (MSG_UNKNOWN_TZ, None)
+
+    if try_parse_list(message.text):
+        return (MSG_LIST, None)
 
     if try_parse_stfu(message.text):
         return (MSG_STFU, None)

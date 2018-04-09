@@ -11,7 +11,11 @@ TEST_USER = '__testuser__'
 TEST_OWNER = '__testowner__'
 TEST_CHANNEL = TEST_USER + "," + TEST_BOT
 NOW_TS = 1523235748.0 # Sunday April 8 2018, 21:02:28 EDT. Monday April 9 2018, 01:02:28 UTC.
+NOW_UTC = datetime.datetime.fromtimestamp(NOW_TS, tz=pytz.utc)
 
+@patch('keybase.send', return_value=True)
+@patch('random.choice', side_effect=lambda i: i[0])
+@patch('util.now_utc', return_value=NOW_UTC)
 class TestBot(unittest.TestCase):
 
     @patch('subprocess.check_call')
@@ -28,10 +32,8 @@ class TestBot(unittest.TestCase):
         user = User.lookup(TEST_USER, DB)
         user.delete()
 
-    @patch('keybase.send')
-    def test_recent_message(self, mockKeybaseSend):
+    def test_recent_message(self, mockNow, mockRandom, mockKeybaseSend):
         # When bot receives two messages in a row, it shouldn't send the full help message twice.
-        mockKeybaseSend.return_value = True
 
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject('not parsable', TEST_USER, TEST_CHANNEL, DB)
@@ -42,14 +44,7 @@ class TestBot(unittest.TestCase):
         bot.process_message(self.config, message, conv)
         mockKeybaseSend.assert_called_with(TEST_CHANNEL, bot.UNKNOWN)
 
-    @patch('keybase.send')
-    @patch('random.choice')
-    @patch('datetime.datetime')
-    def test_set_reminder(self, mockDatetime, mockRandomChoice, mockKeybaseSend):
-        mockKeybaseSend.return_value = True
-        mockRandomChoice.side_effect = lambda i: i[0]
-        mockDatetime.now.return_value = self.now
-
+    def test_set_reminder(self, mockNow, mockRandom, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject("remind me to foo tomorrow", TEST_USER, TEST_CHANNEL, DB)
         bot.process_message(self.config, message, conv)
@@ -57,14 +52,7 @@ class TestBot(unittest.TestCase):
         mockKeybaseSend.assert_called_with(TEST_CHANNEL,
             "Ok! I'll remind you to foo on Monday at 09:02 PM")
 
-    @patch('keybase.send')
-    @patch('random.choice')
-    @patch('datetime.datetime')
-    def test_set_timezone_during_when(self, mockDatetime, mockRandomChoice, mockKeybaseSend):
-        mockKeybaseSend.return_value = True
-        mockRandomChoice.side_effect = lambda i: i[0]
-        mockDatetime.now.return_value = self.now
-
+    def test_set_timezone_during_when(self, mockNow, mockRandom, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject("remind me to foo", TEST_USER, TEST_CHANNEL, DB)
         bot.process_message(self.config, message, conv)
@@ -81,14 +69,7 @@ class TestBot(unittest.TestCase):
         mockKeybaseSend.assert_called_with(TEST_CHANNEL,
             "Ok! I'll remind you to foo at 09:00 AM")
 
-    @patch('keybase.send')
-    @patch('random.choice')
-    @patch('datetime.datetime')
-    def test_set_timezone_after_reminder(self, mockDatetime, mockRandomChoice, mockKeybaseSend):
-        mockKeybaseSend.return_value = True
-        mockRandomChoice.side_effect = lambda i: i[0]
-        mockDatetime.now.return_value = self.now
-
+    def test_set_timezone_after_reminder(self, mockNow, mockRandom, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject("remind me to foo tomorrow at 9am",
                 TEST_USER, TEST_CHANNEL, DB)
@@ -101,6 +82,11 @@ class TestBot(unittest.TestCase):
                 TEST_USER, TEST_CHANNEL, DB)
         bot.process_message(self.config, message, conv)
         mockKeybaseSend.assert_called_with(TEST_CHANNEL, bot.ACK)
+
+        message = keybase.Message.inject("list my reminders", TEST_USER, TEST_CHANNEL, DB)
+        bot.process_message(self.config, message, conv)
+        mockKeybaseSend.assert_called_with(TEST_CHANNEL, "Here are your upcoming reminders:\n\n"
+                "1. foo - on Monday April 09 2018 at 09:00 AM")
 
 if __name__ == '__main__':
     unittest.main()

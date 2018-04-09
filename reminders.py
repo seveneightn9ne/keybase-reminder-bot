@@ -1,21 +1,18 @@
 # Reminders
 
 import random, sqlite3, time
-import datetime
-from user import User
 from pytz import timezone
-import pytz
+
+import util
+from user import User
 
 OK = ["Ok!", "Gotcha." "Sure thing!", "Alright.", "You bet.", "Got it."]
-
-def to_ts(dt):
-    return int(time.mktime(dt.timetuple()))
 
 class Reminder(object):
     def __init__(self, body, time, username, channel, db):
         # time is a datetime in utc
         self.reminder_time = time
-        self.created_time = datetime.datetime.now(pytz.utc)
+        self.created_time = util.now_utc()
         self.body = body
         self.username = username
         self.channel = channel
@@ -25,19 +22,19 @@ class Reminder(object):
     @classmethod
     def lookup(cls, rowid, db):
         with sqlite3.connect(db) as c:
+            c.row_factory = sqlite3.Row
             cur = c.cursor()
-            cur.execute(''' select
-                body,
-                reminder_time,
-                user,
-                channel,
-                created_time from reminders where rowid=?''', (rowid,))
+            cur.execute('select rowid, * from reminders where rowid=?', (rowid,))
             row = cur.fetchone()
         assert row is not None
-        reminder_time = datetime.datetime.fromtimestamp(row[1], tz=pytz.utc) if row[1] else None
-        reminder = Reminder(row[0], reminder_time, row[2], row[3], db)
-        reminder.created_time = datetime.datetime.fromtimestamp(row[4], tz=pytz.utc)
-        reminder.id = rowid
+        return cls.from_row(row, db)
+
+    @classmethod
+    def from_row(cls, row, db):
+        reminder_time = util.from_ts(row["reminder_time"]) if row["reminder_time"] else None
+        reminder = Reminder(row["body"], reminder_time, row["user"], row["channel"], db)
+        reminder.created_time = util.from_ts(row["created_time"])
+        reminder.id = row["rowid"]
         return reminder
 
     def get_user(self):
@@ -56,8 +53,8 @@ class Reminder(object):
             c.execute('delete from reminders where rowid=?', (self.id,))
 
     def store(self):
-        reminder_ts = to_ts(self.reminder_time) if self.reminder_time else None
-        created_ts = to_ts(self.created_time)
+        reminder_ts = util.to_ts(self.reminder_time) if self.reminder_time else None
+        created_ts = util.to_ts(self.created_time)
         with sqlite3.connect(self.db) as c:
             cur = c.cursor()
             cur.execute('''insert into reminders (
@@ -74,16 +71,16 @@ class Reminder(object):
                 self.channel))
             self.id = cur.lastrowid
 
-    def human_time(self):
+    def human_time(self, full=False):
         assert self.reminder_time is not None
         user_tz = self.get_user().timezone
-        now = datetime.datetime.now(pytz.utc)
+        now = util.now_utc()
         delta = self.reminder_time - now
         # Default timezone to US/Eastern TODO magic string used in a couple places
         tz = timezone(user_tz) if user_tz else timezone('US/Eastern')
-        needs_date = delta.total_seconds() > 60 * 60 * 16 # today-ish
-        needs_day = needs_date and delta.days > 7
-        needs_year = needs_day and self.reminder_time.year != now.year
+        needs_date = full or delta.total_seconds() > 60 * 60 * 16 # today-ish
+        needs_day = full or (needs_date and delta.days > 7)
+        needs_year = full or (needs_day and self.reminder_time.year != now.year)
         fmt = ""
         if needs_date:
             fmt += "on %A " # on Monday
@@ -96,7 +93,7 @@ class Reminder(object):
             fmt += " %Z" # EDT or EST
         # TODO maybe this (or something nearby) will throw pytz.exceptions.AmbiguousTimeError
         # near DST transition?
-        return self.reminder_time.replace(tzinfo=pytz.utc).astimezone(tz).strftime(fmt)
+        return util.to_local(self.reminder_time, tz).strftime(fmt)
 
     def confirmation(self):
         return random.choice(OK) + " I'll remind you to " + self.body + " " + self.human_time()

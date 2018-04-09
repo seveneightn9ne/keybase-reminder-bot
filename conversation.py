@@ -1,18 +1,15 @@
 # Conversations (channels)
 
 import sqlite3, time
+
+import util
 from reminders import Reminder
-from datetime import datetime
-import pytz
 
 # Contexts
 CTX_NONE = 0 # no context
 CTX_WHEN = 1 # When should I remind you?
 #CTX_TIMEZONE = 2 # What's your timezone?
 # TODO count unknown messages to send a help text
-
-def to_ts(dt):
-    return int(time.mktime(dt.timetuple()))
 
 class Conversation(object):
     def __init__(self, channel, db):
@@ -37,7 +34,7 @@ class Conversation(object):
         if row is None:
             conv.store()
             return conv
-        conv.last_active_time = datetime.fromtimestamp(row[0], tz=pytz.utc)
+        conv.last_active_time = util.from_ts(row[0])
         #print "Loaded conv last active", conv.last_active_time
         conv.context = row[1]
         conv.reminder_id = row[2]
@@ -48,6 +45,18 @@ class Conversation(object):
         if not self.reminder_id:
             return None
         return Reminder.lookup(self.reminder_id, self.db)
+
+    def get_all_reminders(self):
+        reminders = []
+        with sqlite3.connect(self.db) as c:
+            c.row_factory = sqlite3.Row
+            cur = c.cursor()
+            cur.execute('''select rowid, * from reminders where channel=? and reminder_time>=?
+                    order by reminder_time''',
+                    (self.channel, util.to_ts(util.now_utc())))
+            for row in cur:
+                reminders.append(Reminder.from_row(row, self.db))
+        return reminders
 
     def set_context(self, context, reminder=None):
         assert (not reminder) or reminder.id
@@ -72,17 +81,17 @@ class Conversation(object):
 
     def set_active(self, when=None):
         if when is None:
-            when = datetime.now(pytz.utc)
+            when = util.now_utc()
         self.last_active_time = when
         #print "Setting last active time!", self.last_active_time
         with sqlite3.connect(self.db) as c:
             cur = c.cursor()
             cur.execute('update conversations set last_active_time=? where channel=?',
-                    (to_ts(self.last_active_time), self.channel))
+                    (util.to_ts(self.last_active_time), self.channel))
             assert cur.rowcount == 1
 
     def store(self):
-        active_ts = to_ts(self.last_active_time) if self.last_active_time else 0
+        active_ts = util.to_ts(self.last_active_time) if self.last_active_time else 0
         #print "storing new conv " + self.channel
         with sqlite3.connect(self.db) as c:
             c.execute('''insert into conversations (

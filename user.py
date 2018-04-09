@@ -1,26 +1,8 @@
 # The User
 
 import json, sqlite3
-from datetime import datetime
-from pytz import timezone
 
-def timezone_diff(old, new):
-    # Returns the number of seconds between the two timezone strings.
-    # e.g. timezone_diff('EDT', 'PDT') = 3 * 60 * 60
-    # remind me at 3:00 (assumed EDT)
-    # store as 7:00 UTC
-    # set tz to PDT
-    # modify 7:00 UTC to 10:00 UTC
-    # add 3 hours
-    ref = datetime.utcnow()
-    old_time = ref.replace(tzinfo=timezone(old))
-    new_time = ref.replace(tzinfo=timezone(new))
-    delta = new_time - old_time
-    seconds = delta.total_seconds()
-    if delta.days == -1:
-        seconds = -1 * ((60*60*24) - seconds)
-    return seconds
-
+import util
 
 class User(object):
     def __init__(self, name, timezone, db):
@@ -51,11 +33,12 @@ class User(object):
         # update timezone of all future reminders
         with sqlite3.connect(self.db) as c:
             self.save_settings_inner(c) # transactional with the reminders update
-            # TODO do we also want to update created time..?
             if prev_timezone:
-                diff = timezone_diff(prev_timezone, timezone)
+                diff = util.timezone_diff(prev_timezone, timezone)
                 c.execute('''update reminders set reminder_time=(reminder_time + ?)
                     where user=? and reminder_time not null''', (diff, self.name))
+
+
 
 
     def set_seen_help(self):

@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
 import argparse, configparser, os, pytz, signal, sqlite3, subprocess, sys, time, traceback
-from datetime import datetime
 
-import conversation, keybase, parse
+import conversation, keybase, parse, util
 from conversation import Conversation
 
 # Static response messages
@@ -22,6 +21,8 @@ WHEN = "When do you want to be reminded?"
 ACK = "Got it!"
 ACK_WHEN = ACK + " " + WHEN
 OK = "ok!"
+NO_REMINDERS = "You don't have any upcoming reminders."
+LIST_INTRO = "Here are your upcoming reminders:\n\n"
 
 #HELLO = lambda(name): "Hi " + name + "! To set a reminder just"
 
@@ -80,6 +81,7 @@ def process_message_inner(config, message, conv):
     if msg_type == parse.MSG_REMINDER and message.user().timezone is None:
         keybase.send(conv.channel, ASSUME_TZ)
         message.user().set_timezone("US/Eastern")
+
     if msg_type == parse.MSG_REMINDER:
         reminder = data
         reminder.store()
@@ -88,31 +90,46 @@ def process_message_inner(config, message, conv):
             return keybase.send(conv.channel, WHEN)
         else:
             return keybase.send(conv.channel, reminder.confirmation())
+
     elif msg_type == parse.MSG_STFU:
         conv.clear_context()
         return keybase.send(conv.channel, OK)
+
     elif msg_type == parse.MSG_HELP:
         message.user().set_seen_help()
         return keybase.send(conv.channel, HELP)
+
     elif msg_type == parse.MSG_TIMEZONE:
         message.user().set_timezone(data)
         if conv.context == conversation.CTX_WHEN:
             return keybase.send(conv.channel, ACK_WHEN)
         return keybase.send(conv.channel, ACK)
+
     elif msg_type == parse.MSG_WHEN:
         reminder = conv.get_reminder()
         reminder.set_time(data)
         confirmation = reminder.confirmation()
         conv.set_context(conversation.CTX_NONE)
         return keybase.send(conv.channel, confirmation)
+
+    elif msg_type == parse.MSG_LIST:
+        reminders = conv.get_all_reminders()
+        if not len(reminders):
+            return keybase.send(conv.channel, NO_REMINDERS)
+        response = LIST_INTRO
+        for i, reminder in enumerate(reminders, start=1):
+            response += str(i) + ". " + reminder.body + " - " + reminder.human_time(full=True)
+        return keybase.send(conv.channel, response)
+
     elif msg_type == parse.MSG_UNKNOWN_TZ:
         return keybase.send(conv.channel, HELP_TZ)
+
     elif msg_type == parse.MSG_UNKNOWN:
         if conv.context == conversation.CTX_WHEN:
             return keybase.send(conv.channel, HELP_WHEN)
         else: # CTX_NONE
             if conv.last_active_time and \
-                (datetime.now(pytz.utc) - conv.last_active_time).total_seconds() < 60 * 30:
+                (util.now_utc() - conv.last_active_time).total_seconds() < 60 * 30:
                 # we're in the middle of a conversation
                 return keybase.send(conv.channel, UNKNOWN)
             if not message.is_private_channel():
