@@ -22,7 +22,8 @@ MSG_UNKNOWN_TZ = 6
 def try_parse_when(when, user):
     # include RELATIVE_BASE explicitly so we can mock datetime.now in tests
     local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
-    relative_base = datetime.datetime.now(tz=pytz.timezone(local_timezone_str))
+    relative_base = datetime.datetime.now(tz=pytz.utc).astimezone(
+            pytz.timezone(local_timezone_str))
     parse_date_settings = {
             'PREFER_DATES_FROM': 'future',
             'PREFER_DAY_OF_MONTH': 'first',
@@ -34,7 +35,8 @@ def try_parse_when(when, user):
 
 def try_parse_reminder(message):
     start_phrases = ["remind me to ", "reminder to "]
-    time_phrases = [" every ", " today", " tomorrow", " next ", " at ", " on "]
+    time_phrases = [" every ", " today", " tomorrow", " next ", " sunday", " monday",
+            " tuesday", " wednesday", " thursday", " friday", "saturday", " at ", " on "]
     for start_phrase in start_phrases:
         if start_phrase in message.text.lower():
             rest = message.text.split(start_phrase)[-1]

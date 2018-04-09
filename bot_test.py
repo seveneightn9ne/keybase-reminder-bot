@@ -10,7 +10,7 @@ TEST_BOT = '__testbot__'
 TEST_USER = '__testuser__'
 TEST_OWNER = '__testowner__'
 TEST_CHANNEL = TEST_USER + "," + TEST_BOT
-NOW_TS = 1523235748.0 # April 8 2018, 21:02:28 EDT. April 9 2018, 01:02:28 UTC.
+NOW_TS = 1523235748.0 # Sunday April 8 2018, 21:02:28 EDT. Monday April 9 2018, 01:02:28 UTC.
 
 class TestBot(unittest.TestCase):
 
@@ -59,9 +59,11 @@ class TestBot(unittest.TestCase):
 
     @patch('keybase.send')
     @patch('random.choice')
-    def test_set_timezone_during_when(self, mockRandomChoice, mockKeybaseSend):
+    @patch('datetime.datetime')
+    def test_set_timezone_during_when(self, mockDatetime, mockRandomChoice, mockKeybaseSend):
         mockKeybaseSend.return_value = True
         mockRandomChoice.side_effect = lambda i: i[0]
+        mockDatetime.now.return_value = self.now
 
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject("remind me to foo", TEST_USER, TEST_CHANNEL, DB)
@@ -77,11 +79,28 @@ class TestBot(unittest.TestCase):
         message = keybase.Message.inject("tomorrow at 9am", TEST_USER, TEST_CHANNEL, DB)
         bot.process_message(self.config, message, conv)
         mockKeybaseSend.assert_called_with(TEST_CHANNEL,
-            "Ok! I'll remind you to foo on Monday at 09:00 AM")
+            "Ok! I'll remind you to foo at 09:00 AM")
 
     @patch('keybase.send')
-    def test_set_timezone_after_reminder(self, mockKeybaseSend):
+    @patch('random.choice')
+    @patch('datetime.datetime')
+    def test_set_timezone_after_reminder(self, mockDatetime, mockRandomChoice, mockKeybaseSend):
         mockKeybaseSend.return_value = True
+        mockRandomChoice.side_effect = lambda i: i[0]
+        mockDatetime.now.return_value = self.now
+
+        conv = Conversation.lookup(TEST_CHANNEL, DB)
+        message = keybase.Message.inject("remind me to foo tomorrow at 9am",
+                TEST_USER, TEST_CHANNEL, DB)
+        bot.process_message(self.config, message, conv)
+        mockKeybaseSend.assert_any_call(TEST_CHANNEL, bot.ASSUME_TZ)
+        mockKeybaseSend.assert_called_with(TEST_CHANNEL,
+            "Ok! I'll remind you to foo at 09:00 AM")
+
+        message = keybase.Message.inject("set my timezone to US/Pacific.",
+                TEST_USER, TEST_CHANNEL, DB)
+        bot.process_message(self.config, message, conv)
+        mockKeybaseSend.assert_called_with(TEST_CHANNEL, bot.ACK)
 
 if __name__ == '__main__':
     unittest.main()
