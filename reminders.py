@@ -98,3 +98,16 @@ class Reminder(object):
     def confirmation(self):
         return random.choice(OK) + " I'll remind you to " + self.body + " " + self.human_time()
 
+    def reminder_text(self):
+        return "*Reminder:* " + self.body
+
+def get_due_reminders(db):
+    reminders = []
+    now_ts = util.to_ts(util.now_utc())
+    with sqlite3.connect(db) as c:
+        c.row_factory = sqlite3.Row
+        cur = c.cursor()
+        cur.execute('select rowid, * from reminders where reminder_time>=? limit 100', (now_ts,))
+        for row in cur:
+            reminders.append(Reminder.from_row(row, db))
+    return reminders

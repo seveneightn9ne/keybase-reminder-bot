@@ -51,6 +51,9 @@ class TestBot(unittest.TestCase):
         mockKeybaseSend.assert_any_call(TEST_CHANNEL, bot.ASSUME_TZ)
         mockKeybaseSend.assert_called_with(TEST_CHANNEL,
             "Ok! I'll remind you to foo on Monday at 09:02 PM")
+        mockNow.return_value = NOW_UTC + datetime.timedelta(days=1)
+        bot.send_reminders(self.config)
+        mockKeybaseSend.assert_called_with(TEST_CHANNEL, "*Reminder:* foo")
 
     def test_set_timezone_during_when(self, mockNow, mockRandom, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CHANNEL, DB)

@@ -2,7 +2,7 @@
 
 import argparse, configparser, os, pytz, signal, sqlite3, subprocess, sys, time, traceback
 
-import conversation, keybase, parse, util
+import conversation, keybase, parse, reminders, util
 from conversation import Conversation
 
 # Static response messages
@@ -174,8 +174,11 @@ def process_new_messages(config):
                 raise
 
 def send_reminders(config):
-    # TODO
-    pass
+    for reminder in reminders.get_due_reminders(config.db):
+        conv = Conversation.lookup(reminder.channel, config.db)
+        keybase.send(conv.channel, reminder.reminder_text())
+        print "sent a reminder for", reminder.reminder_time
+        reminder.delete()
 
 class Config(object):
     def __init__(self, db, username, owner):
