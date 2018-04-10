@@ -1,6 +1,6 @@
 # Parsing messages
 
-import dateparser, pytz
+import dateparser, pytz, re
 
 import conversation, util
 from reminders import Reminder
@@ -32,60 +32,62 @@ def try_parse_when(when, user):
             'RETURN_AS_TIMEZONE_AWARE': True,
             'RELATIVE_BASE': relative_base}
     dt = dateparser.parse(when, settings=parse_date_settings)
-    #if dt:
-    #    print "parsed", when, "to", dt
     return dt
 
+def regex(s):
+    return re.compile(s, re.IGNORECASE)
+
 def try_parse_reminder(message):
-    start_phrases = ["remind me to ", "reminder to "]
-    time_phrases = [" every ", " today", " tomorrow", " next ", " sunday", " monday",
-            " tuesday", " wednesday", " thursday", " friday", "saturday", " at ", " on "]
+    start_phrases = [regex(p + "(.*)") for p in ("remind me to ", "reminder to ")]
+    time_phrases = [regex("(.*)(" + p + ".*)") for p in (" every ", " today", " tomorrow",
+        " next ", " sunday", " monday", " tuesday", " wednesday", " thursday", " friday",
+        "saturday", " at ", " on ")]
     for start_phrase in start_phrases:
-        if start_phrase in message.text.lower():
-            rest = message.text.split(start_phrase)[-1]
+        match = start_phrase.search(message.text)
+        if match:
+            rest = match.group(1)
             break
     else:
         return None
 
-    for time_phrase in time_phrases:
-        if time_phrase in rest.lower():
-            parts = rest.split(time_phrase)
-            if len(parts) == 2:
-                reminder_text = parts[0]
-                when = (time_phrase + parts[1]).strip()
-            else:
-                reminder_text = parts[:-1].join(time_phrase)
-                when = (time_phrase + parts[-1]).strip()
-            break
-    else:
-        reminder_text = rest
-        when = ""
-
     user = message.user()
 
-    # need to fill in reminder time
-    reminder = Reminder(reminder_text, None, user.name, message.channel, message.db)
+    possible_whens = [] #(int, reminder, datetime) tuples
 
-    if not when or when.lower().startswith("every"):
-        # TODO every
-        return reminder # will ask for when
+    for time_phrase in time_phrases:
+        match = time_phrase.search(rest)
+        if match:
+            reminder_text = match.group(1).strip()
+            when_text = match.group(2).strip()
+            when = try_parse_when(when_text, user) # may be None
+            possible_whens.append((len(when_text), reminder_text, when))
 
-    reminder.reminder_time = try_parse_when(when, user)
-    #print "Reminder time parsed as", reminder.reminder_time
+    great_whens = filter(lambda w: w[2], possible_whens)
+    if len(great_whens):
+        _, reminder_text, when = max(great_whens, key=lambda pair: pair[0])
+    elif len(possible_whens):
+        _, reminder_text, when = max(possible_whens, key=lambda pair: pair[0])
+    else:
+        reminder_text = rest
+        when = None
 
+    reminder = Reminder(reminder_text, when, user.name, message.channel, message.db)
     return reminder
 
 def try_parse_timezone(text):
-    text = text.lower().strip(" .?!,")
-    start_tzs = ["timezone", "time zone"]
+    text = text.strip(" .?!,")
+    start_tzs = [regex(p + "(.*)") for p in ("timezone", "time zone")]
+    et = [regex(p + "$") for p in ("et", "eastern", "us/eastern")]
+    pt = [regex(p + "$") for p in ("pt", "pacific", "us/pacific")]
     for start_tz in start_tzs:
-        if start_tz in text:
-            rest = text.split(start_tz)[-1]
+        match = start_tz.search(text)
+        if match:
+            rest = match.group(1)
             words = rest.split(" ")
             for word in words:
-                if word == "et" or word == "eastern" or word == "us/eastern":
+                if any(map(lambda e: e.match(word), et)):
                     return "US/Eastern", True
-                if word == "pt" or word == "pacific" or word == "us/pacific":
+                if any(map(lambda p: p.match(word), pt)):
                     return "US/Pacific", True
                 try:
                     pytz.timezone(word)
@@ -108,7 +110,9 @@ def try_parse_stfu(text):
 
 def try_parse_list(text):
     text = text.lower()
-    return "list" in text or ("show" in text and "reminders" in text)
+    return "list" in text \
+            or ("show" in text and "reminders" in text) \
+            or "upcoming" in text
 
 def parse_message(message, conv):
     reminder = try_parse_reminder(message)

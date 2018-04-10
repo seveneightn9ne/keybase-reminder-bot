@@ -13,7 +13,6 @@ def to_local(dt, tz):
 
 def to_ts(dt):
     return (dt - datetime.datetime(1970,1,1, tzinfo=pytz.utc)).total_seconds()
-    #return int(time.mktime(dt.timetuple()))
 
 def from_ts(timestamp):
     return datetime.datetime.fromtimestamp(timestamp, tz=pytz.utc)

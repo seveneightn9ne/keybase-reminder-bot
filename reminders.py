@@ -45,7 +45,8 @@ class Reminder(object):
         assert self.id is not None
         self.reminder_time = time
         with sqlite3.connect(self.db) as c:
-            c.execute('update reminders set reminder_time=? where rowid=?', (time, self.id))
+            c.execute('update reminders set reminder_time=? where rowid=?',
+                    (util.to_ts(time), self.id))
 
     def delete(self):
         assert self.id is not None
@@ -93,7 +94,8 @@ class Reminder(object):
             fmt += " %Z" # EDT or EST
         # TODO maybe this (or something nearby) will throw pytz.exceptions.AmbiguousTimeError
         # near DST transition?
-        return util.to_local(self.reminder_time, tz).strftime(fmt)
+        local = util.to_local(self.reminder_time, tz)
+        return local.strftime(fmt)
 
     def confirmation(self):
         return random.choice(OK) + " I'll remind you to " + self.body + " " + self.human_time()
@@ -107,7 +109,7 @@ def get_due_reminders(db):
     with sqlite3.connect(db) as c:
         c.row_factory = sqlite3.Row
         cur = c.cursor()
-        cur.execute('select rowid, * from reminders where reminder_time>=? limit 100', (now_ts,))
+        cur.execute('select rowid, * from reminders where reminder_time<=? limit 100', (now_ts,))
         for row in cur:
             reminders.append(Reminder.from_row(row, db))
     return reminders
