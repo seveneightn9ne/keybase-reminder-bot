@@ -101,7 +101,7 @@ class Reminder(object):
         return random.choice(OK) + " I'll remind you to " + self.body + " " + self.human_time()
 
     def reminder_text(self):
-        return "*Reminder:* " + self.body
+        return ":bell: *Reminder:* " + self.body
 
 def get_due_reminders(db):
     reminders = []

@@ -59,7 +59,7 @@ class TestBot(unittest.TestCase):
 
         mockNow.return_value = NOW_UTC + timedelta
         bot.send_reminders(self.config)
-        mockKeybaseSend.assert_called_with(TEST_CHANNEL, "*Reminder:* " + reminder)
+        mockKeybaseSend.assert_called_with(TEST_CHANNEL, ":bell: *Reminder:* " + reminder)
 
     def test_set_reminder(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
