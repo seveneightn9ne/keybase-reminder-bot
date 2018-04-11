@@ -6,7 +6,7 @@ from pytz import timezone
 import util
 from user import User
 
-OK = ["Ok!", "Gotcha." "Sure thing!", "Alright.", "You bet.", "Got it."]
+OK = ["Ok!", "Gotcha.", "Sure thing!", "Alright.", "You bet.", "Got it."]
 
 class Reminder(object):
     def __init__(self, body, time, username, channel, db):
