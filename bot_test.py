@@ -86,6 +86,14 @@ class TestBot(unittest.TestCase):
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
+    def test_set_reminder_pre_when(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me tuesday 8am to eat a quiche",
+                "eat a quiche", "on Tuesday at 08:00 AM",
+                "on Tuesday April 10 2018 at 08:00 AM",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+
     def test_set_reminder_separate_when(self, mockNow, mockRandom, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CHANNEL, DB)
         message = keybase.Message.inject("Remind me to say hello", TEST_USER, TEST_CHANNEL, DB)

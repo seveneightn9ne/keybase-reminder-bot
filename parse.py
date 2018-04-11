@@ -38,41 +38,48 @@ def regex(s):
     return re.compile(s, re.IGNORECASE)
 
 def try_parse_reminder(message):
+
+    def split_reminder_when(text):
+        time_phrases = [regex("(.*)(" + p + ".*)") for p in (" every ", " today", " tomorrow",
+            " next ", " sunday", " monday", " tuesday", " wednesday", " thursday", " friday",
+            "saturday", " at ", " on ")]
+        possible_whens = [] #(int, reminder, datetime) tuples
+
+        for time_phrase in time_phrases:
+            match = time_phrase.search(rest)
+            if match:
+                reminder_text = match.group(1).strip()
+                when_text = match.group(2).strip()
+                when = try_parse_when(when_text, user) # may be None
+                possible_whens.append((len(when_text), reminder_text, when))
+
+        great_whens = filter(lambda w: w[2], possible_whens)
+        if len(great_whens):
+            _, reminder_text, when = max(great_whens, key=lambda pair: pair[0])
+        elif len(possible_whens):
+            _, reminder_text, when = max(possible_whens, key=lambda pair: pair[0])
+        else:
+            reminder_text = rest
+            when = None
+        return reminder_text, when
+
+    user = message.user()
+    reminder2 = regex("remind me (.*) to (.*)")
+    match = reminder2.search(message.text)
+    if match:
+        reminder_text = match.group(2)
+        when = try_parse_when(match.group(1), user)
+        return Reminder(reminder_text, when, user.name, message.channel, message.db)
+
     start_phrases = [regex(p + "(.*)") for p in ("remind me to ", "reminder to ")]
-    time_phrases = [regex("(.*)(" + p + ".*)") for p in (" every ", " today", " tomorrow",
-        " next ", " sunday", " monday", " tuesday", " wednesday", " thursday", " friday",
-        "saturday", " at ", " on ")]
     for start_phrase in start_phrases:
         match = start_phrase.search(message.text)
         if match:
             rest = match.group(1)
-            break
-    else:
-        return None
+            reminder_text, when = split_reminder_when(match.group(1))
+            return Reminder(reminder_text, when, user.name, message.channel, message.db)
 
-    user = message.user()
-
-    possible_whens = [] #(int, reminder, datetime) tuples
-
-    for time_phrase in time_phrases:
-        match = time_phrase.search(rest)
-        if match:
-            reminder_text = match.group(1).strip()
-            when_text = match.group(2).strip()
-            when = try_parse_when(when_text, user) # may be None
-            possible_whens.append((len(when_text), reminder_text, when))
-
-    great_whens = filter(lambda w: w[2], possible_whens)
-    if len(great_whens):
-        _, reminder_text, when = max(great_whens, key=lambda pair: pair[0])
-    elif len(possible_whens):
-        _, reminder_text, when = max(possible_whens, key=lambda pair: pair[0])
-    else:
-        reminder_text = rest
-        when = None
-
-    reminder = Reminder(reminder_text, when, user.name, message.channel, message.db)
-    return reminder
+    return None
 
 def try_parse_timezone(text):
     text = text.strip(" .?!,")
