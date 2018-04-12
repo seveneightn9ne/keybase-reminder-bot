@@ -23,7 +23,7 @@ MSG_LIST = 7
 def try_parse_when(when, user):
     # include RELATIVE_BASE explicitly so we can mock now in tests
     local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
-    relative_base = util.now_local(local_timezone_str)
+    relative_base = util.now_local(local_timezone_str).replace(tzinfo=None)
     parse_date_settings = {
             'PREFER_DATES_FROM': 'future',
             'PREFER_DAY_OF_MONTH': 'first',
