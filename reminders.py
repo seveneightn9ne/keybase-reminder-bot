@@ -9,13 +9,13 @@ from user import User
 OK = ["Ok!", "Gotcha.", "Sure thing!", "Alright.", "You bet.", "Got it."]
 
 class Reminder(object):
-    def __init__(self, body, time, username, channel, db):
+    def __init__(self, body, time, username, conv_id, db):
         # time is a datetime in utc
         self.reminder_time = time
         self.created_time = util.now_utc()
         self.body = body
         self.username = username
-        self.channel = channel
+        self.conv_id = conv_id
         self.id = None # when it's from the DB
         self.db = db
 
@@ -32,7 +32,7 @@ class Reminder(object):
     @classmethod
     def from_row(cls, row, db):
         reminder_time = util.from_ts(row["reminder_time"]) if row["reminder_time"] else None
-        reminder = Reminder(row["body"], reminder_time, row["user"], row["channel"], db)
+        reminder = Reminder(row["body"], reminder_time, row["user"], row["conv_id"], db)
         reminder.created_time = util.from_ts(row["created_time"])
         reminder.id = row["rowid"]
         return reminder
@@ -63,13 +63,13 @@ class Reminder(object):
                 created_time,
                 body,
                 user,
-                channel)
+                conv_id)
                 values (?,?,?,?,?)''', (
                 reminder_ts,
                 created_ts,
                 self.body,
                 self.username,
-                self.channel))
+                self.conv_id))
             self.id = cur.lastrowid
 
     def human_time(self, full=False):

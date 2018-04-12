@@ -1,6 +1,6 @@
 # Utilities for interacting with the keybase chat api
 
-import json, subprocess
+import json, subprocess, sys
 from subprocess import PIPE
 from user import User
 
@@ -25,25 +25,28 @@ class Message(object):
                 u'uid': u'653ba091fa61606e5a3c8fb2086b3419',
                 u'device_id': u'c4aec52a455b551af3b042c46537fc18'}}}]}
         '''
-    def __init__(self, json, db):
+    def __init__(self, conv_id, json, db):
         self.text = json["msg"]["content"]["text"]["body"]
         self.author = json["msg"]["sender"]["username"]
-        self.channel = json["msg"]["channel"]["name"]
+        self.conv_id = conv_id
+        self.channel_json = json["msg"]["channel"]
         self.json = json
         self.db = db
 
     @classmethod
-    def inject(cls, text, author, channel, db):
-        return Message({"msg": {
+    def inject(cls, text, author, conv_id, channel, db):
+        return Message(conv_id, {"msg": {
             "content": {"text": {"body": text}},
             "sender": {"username": author},
-            "channel": {"name": channel}}}, db)
+            "channel": {
+                "name": channel,
+                "members_type": "impteamnative"}}}, db)
 
     def user(self):
         return User.lookup(self.author, self.db)
 
     def is_private_channel(self):
-        return self.channel.count(',') == 1
+        return self.channel_json["name"].count(',') == 1
 
 def call(method, params=None):
     # method: string, params: dict
@@ -57,16 +60,32 @@ def call(method, params=None):
     proc.stdin.write(json.dumps(query) + "\n")
     proc.stdin.close()
     response = proc.stdout.readline()
-    #print "finished keybase call"
-    return json.loads(response)["result"]
+    j = json.loads(response)
+    if "error" in j:
+        print "Problem with query:", query
+        raise Exception(j["error"]["message"])
 
-def send(channel, text):
-    call("send", {"options": {"channel": {"name": channel}, "message": {"body": text}}})
+    return j["result"]
+
+def send(conv_id, text):
+    call("send", {"options": {"conversation_id": conv_id, "message": {"body": text}}})
     return True
 
-def status():
+def _status():
     proc = subprocess.Popen(['keybase','status', '-j'], stdout=PIPE)
     out, err = proc.communicate()
     return json.loads(out)
 
-
+def setup(username):
+    status = _status()
+    if not status["LoggedIn"]:
+        try:
+            subprocess.check_call(['keybase', 'login', username])
+        except subprocess.CalledProcessError:
+            print >> sys.stderr, "FATAL: Error during call to `keybase login " \
+                    + username + "`"
+            sys.exit(1)
+    elif not status["Username"] == username:
+        print >> sys.stderr, "FATAL: There's another user logged in to Keybase already." \
+                " You'll need to log them out first."
+        sys.exit(1)

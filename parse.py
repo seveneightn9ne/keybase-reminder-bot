@@ -69,7 +69,10 @@ def try_parse_reminder(message):
     if match:
         reminder_text = match.group(2)
         when = try_parse_when(match.group(1), user)
-        return Reminder(reminder_text, when, user.name, message.channel, message.db)
+        if when:
+            return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
+        # else: Ideally we'd try the following block and if that doesn't find a when
+        # then assume we're in this case but couldn't read the when. But whatever.
 
     start_phrases = [regex(p + "(.*)") for p in ("remind me to ", "reminder to ")]
     for start_phrase in start_phrases:
@@ -77,7 +80,7 @@ def try_parse_reminder(message):
         if match:
             rest = match.group(1)
             reminder_text, when = split_reminder_when(match.group(1))
-            return Reminder(reminder_text, when, user.name, message.channel, message.db)
+            return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
 
     return None
 
