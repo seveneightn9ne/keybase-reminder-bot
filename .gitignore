@@ -100,5 +100,6 @@ ENV/
 # mypy
 .mypy_cache/
 
-# test database
 test.db
+local.ini
+.vagrant
