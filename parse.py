@@ -5,6 +5,7 @@ import dateparser, pytz, re
 import conversation, util
 from reminders import Reminder
 from user import User
+from datetime import datetime # don't use anything that uses now.
 
 MSG_UNKNOWN = 0
 MSG_REMINDER = 1
@@ -22,9 +23,38 @@ MSG_SOURCE = 8
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):
+
+    def fixup_times(when_str, relative_base):
+        # When there is no explicit AM/PM assume the next upcoming one
+        # HH:(MM)? (AM|PM)?
+        time_regex = regex('(?:[^\w]|^)(\d\d?(:\d\d)?)\s?([ap]\.?m.?)?')
+        results = re.findall(time_regex, when_str)
+        times = [(m[0], m[1]) for m in results if m[2] == '']
+        if len(times) != 1:
+            # I don't expect to find more than one time. Rather not do anything.
+            return when_str
+
+        time_to_replace, minutes = times[0]
+        for fmt in ('%I', '%I:%M'):
+            try:
+                time = datetime.strptime(time_to_replace, fmt)
+                break
+            except ValueError:
+                pass
+        else:
+            return when_str # Couldn't parse a time
+
+        if time.hour > 12:
+            return # you explicitly are after noon
+
+        if relative_base.hour > time.hour:
+            new_hour = str(time.hour + 12)
+            return when_str.replace(time_to_replace, new_hour + minutes)
+
     # include RELATIVE_BASE explicitly so we can mock now in tests
     local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
     relative_base = util.now_local(local_timezone_str).replace(tzinfo=None)
+    when = fixup_times(when, relative_base)
     parse_date_settings = {
             'PREFER_DATES_FROM': 'future',
             'PREFER_DAY_OF_MONTH': 'first',

@@ -84,6 +84,14 @@ class TestBot(unittest.TestCase):
 
     def test_set_reminder_day_time(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
+                "remind me to paint dan's fence at 10:30",
+                "paint dan's fence", "at 10:30 PM",
+                "on Sunday April 08 2018 at 10:30 PM",
+                datetime.timedelta(hours=2),
+                mockNow, mockKeybaseSend)
+
+    def test_set_reminder_day_time(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
                 "remind me to paint dan's fence today at 10:30pm",
                 "paint dan's fence", "at 10:30 PM",
                 "on Sunday April 08 2018 at 10:30 PM",
