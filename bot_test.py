@@ -1,7 +1,8 @@
 import datetime, pytz, sqlite3, unittest
+import mock
 from mock import patch
 
-import bot, conversation, keybase, reminders
+import bot, conversation, keybase, reminders, parse
 from conversation import Conversation
 from user import User
 
@@ -39,7 +40,7 @@ class TestBot(unittest.TestCase):
         # When bot receives two messages in a row, it shouldn't send the full help message twice.
 
         conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
-        message = keybase.Message.inject('not parsable', TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
+        message = keybase.Message.inject(u'not parsable', TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
 
         bot.process_message(self.config, message, conv)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.PROMPT_HELP)
@@ -162,6 +163,14 @@ class TestBot(unittest.TestCase):
         bot.process_message(self.config, message, conv)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, "Here are your upcoming reminders:\n\n"
                 "1. foo - on Monday April 09 2018 at 09:00 AM\n")
+
+    def test_parse_source(self, mockNow, mockRandom, mockKeybaseSend):
+        conv = mock.Mock()
+        conv.context = conversation.CTX_NONE
+        msg = mock.Mock()
+        msg.text = u" What are you made of??"
+        (tag, obj) = parse.parse_message(msg, conv)
+        assert tag == parse.MSG_SOURCE
 
 if __name__ == '__main__':
     unittest.main()
