@@ -133,10 +133,7 @@ def withoutchars(s, cs):
     return s.translate(table)
 
 def try_parse_source(text):
-    s = withoutchars(trimlower(text), "\"'")
-    if s[-1] != "?":
-        return None
-    s = withoutchars(s[:-1], "?")
+    s = trimlower(withoutchars(text, "\"'?"))
     forms = [
         "what are you made of",
         "what are you",
@@ -144,10 +141,9 @@ def try_parse_source(text):
         "how do you work",
         "what are you written in",
     ]
-    for form in forms:
-        if s == form:
-            return True
-    return False
+    if s in forms:
+        return True
+    return None
 
 def parse_message(message, conv):
     reminder = try_parse_reminder(message)
@@ -176,7 +172,7 @@ def parse_message(message, conv):
 
     source = try_parse_source(message.text)
     if source is not None:
-        return (MSG_SOURCE, source)
+        return (MSG_SOURCE, None)
 
     return (MSG_UNKNOWN, None)
 

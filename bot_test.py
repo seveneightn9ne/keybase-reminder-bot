@@ -165,12 +165,15 @@ class TestBot(unittest.TestCase):
                 "1. foo - on Monday April 09 2018 at 09:00 AM\n")
 
     def test_parse_source(self, mockNow, mockRandom, mockKeybaseSend):
-        conv = mock.Mock()
-        conv.context = conversation.CTX_NONE
-        msg = mock.Mock()
-        msg.text = u" What are you made of??"
-        (tag, obj) = parse.parse_message(msg, conv)
-        assert tag == parse.MSG_SOURCE
+        for q in [False, True]:
+            conv = mock.Mock()
+            conv.context = conversation.CTX_NONE
+            msg = mock.Mock()
+            msg.text = u" What are you made of"
+            if q:
+                msg.text += "??"
+            (tag, obj) = parse.parse_message(msg, conv)
+            assert tag == parse.MSG_SOURCE
 
 if __name__ == '__main__':
     unittest.main()
