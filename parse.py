@@ -120,13 +120,10 @@ def try_parse_stfu(text):
             or text == "never"
 
 def try_parse_list(text):
-    s = trimlower(text)
-    if s.split(" ")[0] == "list":
-        return True
-    if "show" in text and "reminders" in text:
-        return True
-    if "show" in text and "upcoming" in text:
-        return True
+    text = trimlower(text)
+    return "list" in text \
+            or ("show" in text and "reminders" in text) \
+            or "upcoming" in text
 
 def trimlower(s):
     return s.strip().lower()
