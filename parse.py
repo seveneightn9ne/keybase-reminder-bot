@@ -140,7 +140,7 @@ def try_parse_source(text):
     forms = [
         "what are you made of",
         "what are you",
-        "where(s) the source",
+        "wheres the source",
         "how do you work",
         "what are you written in",
     ]
