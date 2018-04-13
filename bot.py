@@ -129,7 +129,7 @@ def process_new_messages(config):
                 "unread_only": True}}
         response = keybase.call("read", params)
         #print "other response", response
-        for message in response["messages"]:
+        for message in reversed(response["messages"]):
             if "error" in message:
                 print "message error: {}".format(message["error"])
                 continue
