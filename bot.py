@@ -23,8 +23,8 @@ ACK_WHEN = ACK + " " + WHEN
 OK = "ok!"
 NO_REMINDERS = "You don't have any upcoming reminders."
 LIST_INTRO = "Here are your upcoming reminders:\n\n"
-
-#HELLO = lambda(name): "Hi " + name + "! To set a reminder just"
+SOURCE = "I'm a bot written in python by @jessk.\n"\
+         "Source available here: https://github.com/seveneightn9ne/keybase-reminder-bot"
 
 # Returns True iff I interacted with the user.
 def process_message_inner(config, message, conv):
@@ -81,6 +81,9 @@ def process_message_inner(config, message, conv):
             response += str(i) + ". " + reminder.body + " - " + reminder.human_time(full=True) + "\n"
         return keybase.send(conv.id, response)
 
+    elif msg_type == parse.MSG_SOURCE:
+        return keybase.send(conv.id, SOURCE)
+
     elif msg_type == parse.MSG_UNKNOWN_TZ:
         return keybase.send(conv.id, HELP_TZ)
 
@@ -126,10 +129,14 @@ def process_new_messages(config):
                 "unread_only": True}}
         response = keybase.call("read", params)
         #print "other response", response
-        for message in response["messages"]:
+        for message in reversed(response["messages"]):
+            if "error" in message:
+                print "message error: {}".format(message["error"])
+                continue
             # TODO consider processing all messages together
             if not "text" in message["msg"]["content"]:
                 # Ignore messages like edits and people joining the channel
+                print "ignoring message of type: {}".format(message["msg"]["content"]["type"])
                 continue
             try:
                 process_message(config, keybase.Message(id, message, config.db), conv)

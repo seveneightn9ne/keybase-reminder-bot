@@ -14,6 +14,7 @@ MSG_TIMEZONE = 4
 MSG_STFU = 5
 MSG_UNKNOWN_TZ = 6
 MSG_LIST = 7
+MSG_SOURCE = 8
 # TODO MSG_SNOOZE
 # TODO MSG_ACK
 # TODO MSG_GREETING
@@ -119,10 +120,30 @@ def try_parse_stfu(text):
             or text == "never"
 
 def try_parse_list(text):
-    text = text.lower()
+    text = trimlower(text)
     return "list" in text \
             or ("show" in text and "reminders" in text) \
             or "upcoming" in text
+
+def trimlower(s):
+    return s.strip().lower()
+
+def withoutchars(s, cs):
+    table = dict.fromkeys(map(ord, cs), None)
+    return s.translate(table)
+
+def try_parse_source(text):
+    s = trimlower(withoutchars(text, "\"'?"))
+    forms = [
+        "what are you made of",
+        "what are you",
+        "wheres the source",
+        "how do you work",
+        "what are you written in",
+    ]
+    if s in forms:
+        return True
+    return None
 
 def parse_message(message, conv):
     reminder = try_parse_reminder(message)
@@ -148,6 +169,10 @@ def parse_message(message, conv):
 
     if try_parse_stfu(message.text):
         return (MSG_STFU, None)
+
+    source = try_parse_source(message.text)
+    if source is not None:
+        return (MSG_SOURCE, None)
 
     return (MSG_UNKNOWN, None)
 

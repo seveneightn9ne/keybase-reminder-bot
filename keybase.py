@@ -78,6 +78,7 @@ def _status():
 
 def setup(username):
     status = _status()
+    logged_in = status["Username"]
     if not status["LoggedIn"]:
         try:
             subprocess.check_call(['keybase', 'login', username])
@@ -85,7 +86,8 @@ def setup(username):
             print >> sys.stderr, "FATAL: Error during call to `keybase login " \
                     + username + "`"
             sys.exit(1)
-    elif not status["Username"] == username:
-        print >> sys.stderr, "FATAL: There's another user logged in to Keybase already." \
-                " You'll need to log them out first."
+    elif not logged_in == username:
+        print >> sys.stderr, "FATAL: Logged in to Keybase as wrong user."
+        print >> sys.stderr, "Logged in as "+logged_in+" but expected "+username+". "
+        print >> sys.stderr, "Run `keybase logout` to log them out."
         sys.exit(1)
