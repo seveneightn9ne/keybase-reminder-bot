@@ -17,4 +17,5 @@ end
 # pip install -r requirements.txt
 
 # keybase login <username>
+# python bot_test.py
 # ./bot.py --config=local.ini
