@@ -36,30 +36,25 @@ class TestBot(unittest.TestCase):
         user = User.lookup(TEST_USER, DB)
         user.delete()
 
+    def message_test(self, incoming, outgoing, mockKeybaseSend):
+        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
+        message = keybase.Message.inject(incoming, TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
+        bot.process_message(self.config, message, conv)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, outgoing)
+
     def test_recent_message(self, mockNow, mockRandom, mockKeybaseSend):
         # When bot receives two messages in a row, it shouldn't send the full help message twice.
-
-        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
-        message = keybase.Message.inject(u'not parsable', TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.PROMPT_HELP)
-
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.UNKNOWN)
+        self.message_test(u'not parsable', bot.PROMPT_HELP, mockKeybaseSend)
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=1)
+        self.message_test(u'not parsable', bot.UNKNOWN, mockKeybaseSend)
 
     def reminder_test(self, text, reminder, whentext, fullwhen, timedelta, mockNow, mockKeybaseSend):
-        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
-        message = keybase.Message.inject(text, TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
+        self.message_test(text,
+                "Ok! I'll remind you to " + reminder + " " + whentext, mockKeybaseSend)
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID,
-            "Ok! I'll remind you to " + reminder + " " + whentext)
 
-        message = keybase.Message.inject("list", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, "Here are your upcoming reminders:\n\n"
-                "1. " + reminder + " - " + fullwhen + "\n")
+        self.message_test("list", "Here are your upcoming reminders:\n\n"
+                "1. " + reminder + " - " + fullwhen + "\n", mockKeybaseSend)
 
         mockNow.return_value = NOW_UTC + timedelta
         bot.send_reminders(self.config)
@@ -115,62 +110,33 @@ class TestBot(unittest.TestCase):
                 mockNow, mockKeybaseSend)
 
     def test_set_reminder_separate_when(self, mockNow, mockRandom, mockKeybaseSend):
-        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
-        message = keybase.Message.inject("Remind me to say hello", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
+
+        self.message_test("Remind me to say hello", bot.WHEN, mockKeybaseSend)
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.WHEN)
-
-
-        message = keybase.Message.inject("10pm", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID,
-                "Ok! I'll remind you to say hello at 10:00 PM")
-
-        message = keybase.Message.inject("List", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, "Here are your upcoming reminders:\n\n"
-                "1. say hello - on Sunday April 08 2018 at 10:00 PM\n")
+        self.message_test("10pm", "Ok! I'll remind you to say hello at 10:00 PM", mockKeybaseSend)
+        self.message_test("List", "Here are your upcoming reminders:\n\n"
+                "1. say hello - on Sunday April 08 2018 at 10:00 PM\n", mockKeybaseSend)
 
         mockNow.return_value = NOW_UTC + datetime.timedelta(hours=1)
         bot.send_reminders(self.config)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* say hello")
 
     def test_set_timezone_during_when(self, mockNow, mockRandom, mockKeybaseSend):
-        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
-        message = keybase.Message.inject("remind me to foo", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
+
+        self.message_test("remind me to foo", bot.WHEN, mockKeybaseSend)
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.WHEN)
-
-        message = keybase.Message.inject("set my timezone to US/Pacific.",
-                TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.ACK_WHEN)
-
-        message = keybase.Message.inject("tomorrow at 9am", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID,
-            "Ok! I'll remind you to foo at 09:00 AM")
+        self.message_test("set my timezone to US/Pacific", bot.ACK_WHEN, mockKeybaseSend)
+        self.message_test("tomorrow at 9am",
+                "Ok! I'll remind you to foo at 09:00 AM", mockKeybaseSend)
 
     def test_set_timezone_after_reminder(self, mockNow, mockRandom, mockKeybaseSend):
-        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
-        message = keybase.Message.inject("remind me to foo tomorrow at 9am",
-                TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
+
+        self.message_test("remind me to foo tomorrow at 9am",
+                "Ok! I'll remind you to foo at 09:00 AM", mockKeybaseSend)
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID,
-            "Ok! I'll remind you to foo at 09:00 AM")
-
-        message = keybase.Message.inject("set my timezone to US/Pacific.",
-                TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.ACK)
-
-        message = keybase.Message.inject("list my reminders", TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, "Here are your upcoming reminders:\n\n"
-                "1. foo - on Monday April 09 2018 at 09:00 AM\n")
+        self.message_test("set my timezone to US/Pacific.", bot.ACK, mockKeybaseSend)
+        self.message_test("list my reminders", "Here are your upcoming reminders:\n\n"
+                "1. foo - on Monday April 09 2018 at 09:00 AM\n", mockKeybaseSend)
 
     def test_parse_source(self, mockNow, mockRandom, mockKeybaseSend):
         for q in [False, True]:
@@ -182,6 +148,9 @@ class TestBot(unittest.TestCase):
                 msg.text += "??"
             (tag, obj) = parse.parse_message(msg, conv)
             assert tag == parse.MSG_SOURCE
+
+    def test_help(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test("help", bot.HELP % TEST_OWNER, mockKeybaseSend)
 
 if __name__ == '__main__':
     unittest.main()

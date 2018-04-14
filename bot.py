@@ -25,6 +25,13 @@ NO_REMINDERS = "You don't have any upcoming reminders."
 LIST_INTRO = "Here are your upcoming reminders:\n\n"
 SOURCE = "I'm a bot written in python by @jessk.\n"\
          "Source available here: https://github.com/seveneightn9ne/keybase-reminder-bot"
+HELP = """*help* _shows this message._
+*remind me [when] to [what]* or *remind me to [what] [when]* _set a reminder._
+*list* _show upcoming reminders._
+*set my timezone to [tz]* _sets your timezone. This changes when any upcoming reminders will happen._
+
+In general, if I didn't understand, I'll ask for clarification.
+If you have any feedback or suggestions, @%s would love to hear them."""
 
 # Returns True iff I interacted with the user.
 def process_message_inner(config, message, conv):
@@ -57,7 +64,7 @@ def process_message_inner(config, message, conv):
 
     elif msg_type == parse.MSG_HELP:
         message.user().set_seen_help()
-        return keybase.send(conv.id, HELP)
+        return keybase.send(conv.id, HELP % config.owner)
 
     elif msg_type == parse.MSG_TIMEZONE:
         message.user().set_timezone(data)
