@@ -16,10 +16,9 @@ MSG_STFU = 5
 MSG_UNKNOWN_TZ = 6
 MSG_LIST = 7
 MSG_SOURCE = 8
+MSG_ACK = 9
+MSG_GREETING = 10
 # TODO MSG_SNOOZE
-# TODO MSG_ACK
-# TODO MSG_GREETING
-# TODO MSG_LIST
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):
@@ -159,8 +158,9 @@ def trimlower(s):
     return s.strip().lower()
 
 def withoutchars(s, cs):
-    table = dict.fromkeys(map(ord, cs), None)
-    return s.translate(table)
+    for c in cs:
+        s = s.replace(c, '')
+    return s
 
 def try_parse_source(text):
     s = trimlower(withoutchars(text, "\"'?"))
@@ -175,7 +175,25 @@ def try_parse_source(text):
         return True
     return None
 
-def parse_message(message, conv):
+def heavy_cleanup(text, botname):
+    text = text.replace("@" + botname, '')
+    text = text.replace(botname, '')
+    text = text.replace('  ', ' ')
+    return trimlower(withoutchars(text, "\"'.,:!?"))
+
+def try_parse_ack(text, config):
+    text = heavy_cleanup(text, config.username)
+    return text in ("ok", "thanks", "thank you", "cool", "great", "okay", "done", "will do")
+
+def try_parse_greeting(text, config):
+    text = heavy_cleanup(text, config.username)
+    greetings = ("hi", "hello", "hey", "good morning", "good afternoon", "good evening")
+    for g in greetings:
+        if g in text:
+            return g + "!"
+    return None
+
+def parse_message(message, conv, config):
     reminder = try_parse_reminder(message)
     if reminder:
         return (MSG_REMINDER, reminder)
@@ -203,6 +221,13 @@ def parse_message(message, conv):
     source = try_parse_source(message.text)
     if source is not None:
         return (MSG_SOURCE, None)
+
+    if conv.expects_ack() and try_parse_ack(message.text, config):
+        return (MSG_ACK, None)
+
+    greeting = try_parse_greeting(message.text, config)
+    if not conv.is_recently_active() and greeting is not None:
+        return (MSG_GREETING, greeting)
 
     return (MSG_UNKNOWN, None)
 

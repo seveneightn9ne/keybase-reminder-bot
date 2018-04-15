@@ -43,7 +43,7 @@ def process_message_inner(config, message, conv):
 
     # TODO need some sort of onboarding for first-time user
 
-    msg_type, data = parse.parse_message(message, conv)
+    msg_type, data = parse.parse_message(message, conv, config)
     print "Received message parsed as " + str(msg_type)
     if msg_type == parse.MSG_REMINDER and message.user().timezone is None:
         keybase.send(conv.id, ASSUME_TZ)
@@ -56,6 +56,7 @@ def process_message_inner(config, message, conv):
             conv.set_context(conversation.CTX_WHEN, reminder=reminder)
             return keybase.send(conv.id, WHEN)
         else:
+            conv.set_context(conversation.CTX_SET, reminder=reminder)
             return keybase.send(conv.id, reminder.confirmation())
 
     elif msg_type == parse.MSG_STFU:
@@ -64,23 +65,26 @@ def process_message_inner(config, message, conv):
 
     elif msg_type == parse.MSG_HELP:
         message.user().set_seen_help()
+        conv.clear_weak_context()
         return keybase.send(conv.id, HELP % config.owner)
 
     elif msg_type == parse.MSG_TIMEZONE:
         message.user().set_timezone(data)
         if conv.context == conversation.CTX_WHEN:
             return keybase.send(conv.id, ACK_WHEN)
+        conv.clear_weak_context()
         return keybase.send(conv.id, ACK)
 
     elif msg_type == parse.MSG_WHEN:
         reminder = conv.get_reminder()
         reminder.set_time(data)
         confirmation = reminder.confirmation()
-        conv.set_context(conversation.CTX_NONE)
+        conv.set_context(conversation.CTX_SET, reminder=reminder)
         return keybase.send(conv.id, confirmation)
 
     elif msg_type == parse.MSG_LIST:
         reminders = conv.get_all_reminders()
+        conv.clear_weak_context()
         if not len(reminders):
             return keybase.send(conv.id, NO_REMINDERS)
         response = LIST_INTRO
@@ -89,17 +93,27 @@ def process_message_inner(config, message, conv):
         return keybase.send(conv.id, response)
 
     elif msg_type == parse.MSG_SOURCE:
+        conv.clear_weak_context()
         return keybase.send(conv.id, SOURCE)
 
     elif msg_type == parse.MSG_UNKNOWN_TZ:
+        conv.clear_weak_context()
         return keybase.send(conv.id, HELP_TZ)
 
+    elif msg_type == parse.MSG_ACK:
+        conv.clear_weak_context()
+        return True
+
+    elif msg_type == parse.MSG_GREETING:
+        conv.clear_weak_context()
+        return keybase.send(conv.id, data)
+
     elif msg_type == parse.MSG_UNKNOWN:
+        conv.clear_weak_context()
         if conv.context == conversation.CTX_WHEN:
             return keybase.send(conv.id, HELP_WHEN)
         else: # CTX_NONE
-            if conv.last_active_time and \
-                (util.now_utc() - conv.last_active_time).total_seconds() < 60 * 30:
+            if conv.is_recently_active():
                 # we're in the middle of a conversation
                 return keybase.send(conv.id, UNKNOWN)
             if not message.is_private_channel():
@@ -159,6 +173,8 @@ def send_reminders(config):
         keybase.send(conv.id, reminder.reminder_text())
         print "sent a reminder for", reminder.reminder_time
         reminder.delete()
+        conv.set_active()
+        conv.set_context(conversation.CTX_REMINDED)
 
 class Config(object):
     def __init__(self, db, username, owner):

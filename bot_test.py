@@ -139,18 +139,29 @@ class TestBot(unittest.TestCase):
                 "1. foo - on Monday April 09 2018 at 09:00 AM\n", mockKeybaseSend)
 
     def test_parse_source(self, mockNow, mockRandom, mockKeybaseSend):
-        for q in [False, True]:
-            conv = mock.Mock()
-            conv.context = conversation.CTX_NONE
-            msg = mock.Mock()
-            msg.text = u" What are you made of"
-            if q:
-                msg.text += "??"
-            (tag, obj) = parse.parse_message(msg, conv)
-            assert tag == parse.MSG_SOURCE
+        self.message_test(" What are you made of", bot.SOURCE, mockKeybaseSend)
+        self.message_test(" What are you made of??", bot.SOURCE, mockKeybaseSend)
 
     def test_help(self, mockNow, mockRandom, mockKeybaseSend):
         self.message_test("help", bot.HELP % TEST_OWNER, mockKeybaseSend)
+
+    def test_hello(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test("hi", "hi!", mockKeybaseSend)
+
+        conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
+        conv.delete()
+
+        self.message_test("hello", "hello!", mockKeybaseSend)
+
+    def test_ack(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to foo tomorrow",
+                "foo", "on Monday at 09:02 PM",
+                "on Monday April 09 2018 at 09:02 PM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+        # Asserts that bot didn't send any message since the reminder
+        self.message_test("thanks", ":bell: *Reminder:* foo", mockKeybaseSend)
 
 if __name__ == '__main__':
     unittest.main()

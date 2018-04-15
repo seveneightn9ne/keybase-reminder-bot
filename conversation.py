@@ -8,6 +8,8 @@ from reminders import Reminder
 # Contexts
 CTX_NONE = 0 # no context
 CTX_WHEN = 1 # When should I remind you?
+CTX_REMINDED = 2 # I've just sent you a reminder.
+CTX_SET = 3 # You just finished setting a reminder.
 #CTX_TIMEZONE = 2 # What's your timezone?
 # TODO count unknown messages to send a help text
 
@@ -73,12 +75,21 @@ class Conversation(object):
                 reminders.append(Reminder.from_row(row, self.db))
         return reminders
 
+    def is_recently_active(self):
+        MINUTES = 30
+        return self.last_active_time and \
+                (util.now_utc() - self.last_active_time).total_seconds() < 60 * MINUTES
+
+    def expects_ack(self):
+        return self.is_recently_active() and self.context in (CTX_REMINDED, CTX_SET)
+
     def set_context(self, context, reminder=None):
         assert (not reminder) or reminder.id
         reminder_id = reminder.id if reminder else None
-        if context == CTX_NONE:
+        if context in (CTX_NONE, CTX_REMINDED):
+            # In CTX_REMINDED, the reminder has been deleted already.
             assert reminder_id == None
-        if context == CTX_WHEN:
+        if context in (CTX_WHEN, CTX_SET):
             assert reminder_id != None
 
         self.context = context
@@ -90,9 +101,13 @@ class Conversation(object):
                 (context, reminder_id, self.id))
 
     def clear_context(self):
-        if self.reminder_id:
+        if self.context == CTX_WHEN and self.reminder_id:
             self.get_reminder().delete()
         self.set_context(CTX_NONE)
+
+    def clear_weak_context(self):
+        if self.context in (CTX_SET, CTX_REMINDED):
+            self.set_context(CTX_NONE)
 
     def set_active(self, when=None):
         if when is None:
