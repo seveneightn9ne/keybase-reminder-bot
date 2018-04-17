@@ -109,6 +109,15 @@ class TestBot(unittest.TestCase):
                 datetime.timedelta(days=30),
                 mockNow, mockKeybaseSend)
 
+    def test_reminder_listen(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me at 7:45 to listen to big song on speakers",
+                "listen to big song on speakers", "on Monday at 07:45 PM",
+                "on Monday April 09 2018 at 07:45 PM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+
+
     def test_set_reminder_separate_when(self, mockNow, mockRandom, mockKeybaseSend):
 
         self.message_test("Remind me to say hello", bot.WHEN, mockKeybaseSend)
