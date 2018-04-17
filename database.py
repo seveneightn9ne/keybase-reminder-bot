@@ -27,6 +27,9 @@ def initial_tables(c):
         debug boolean not null)''')
     c.execute('create unique index if not exists idx_conversations_id on conversations(id)')
 
+def add_reminder_deleted(c):
+    c.execute('alter table reminders add deleted boolean not null default 0')
+
 def setup(db):
     try:
         c = sqlite3.connect(db)
@@ -40,6 +43,7 @@ def setup(db):
 
     migrations = [
             initial_tables,
+            add_reminder_deleted,
         ]
     for i, migration in enumerate(migrations, start=1):
         if db_version < i:

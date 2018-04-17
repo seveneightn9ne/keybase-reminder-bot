@@ -207,6 +207,18 @@ def try_parse_undo(text, config):
             return True
     return None
 
+def try_parse_delete_by_what(text):
+    # TODO
+    pass
+
+def try_parse_delete_by_when(text):
+    # TODO
+    pass
+
+def try_parse_delete_by_idx(text):
+    # TODO
+    pass
+
 def parse_message(message, conv, config):
     reminder = try_parse_reminder(message)
     if reminder:
@@ -233,7 +245,7 @@ def parse_message(message, conv, config):
         if try_parse_stfu(message.text):
             return (MSG_STFU, None)
 
-    if conv.context == conversation.CTX_SET:
+    if conv.context in (conversation.CTX_SET, conversation.CTX_DELETED):
         if try_parse_undo(message.text, config):
             return (MSG_UNDO, None)
 

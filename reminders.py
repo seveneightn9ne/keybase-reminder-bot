@@ -16,6 +16,7 @@ class Reminder(object):
         self.body = body
         self.username = username
         self.conv_id = conv_id
+        self.deleted = False
         self.id = None # when it's from the DB
         self.db = db
 
@@ -35,6 +36,7 @@ class Reminder(object):
         reminder = Reminder(row["body"], reminder_time, row["user"], row["conv_id"], db)
         reminder.created_time = util.from_ts(row["created_time"])
         reminder.id = row["rowid"]
+        reminder.deleted = row["deleted"]
         return reminder
 
     def get_user(self):
@@ -49,6 +51,20 @@ class Reminder(object):
                     (util.to_ts(time), self.id))
 
     def delete(self):
+        self.deleted = True
+        assert self.id is not None
+        with sqlite3.connect(self.db) as c:
+            cur = c.cursor()
+            cur.execute('update reminders set deleted=1 where rowid=?', (self.id,))
+            assert cur.rowcount == 1
+
+    def undelete(self):
+        self.deleted = False
+        assert self.id is not None
+        with sqlite3.connect(self.db) as c:
+            c.execute('update reminders set deleted=0 where rowid=?', (self.id,))
+
+    def permadelete(self):
         assert self.id is not None
         with sqlite3.connect(self.db) as c:
             c.execute('delete from reminders where rowid=?', (self.id,))
@@ -63,13 +79,15 @@ class Reminder(object):
                 created_time,
                 body,
                 user,
-                conv_id)
-                values (?,?,?,?,?)''', (
+                conv_id,
+                deleted)
+                values (?,?,?,?,?,?)''', (
                 reminder_ts,
                 created_ts,
                 self.body,
                 self.username,
-                self.conv_id))
+                self.conv_id,
+                self.deleted))
             self.id = cur.lastrowid
 
     def human_time(self, full=False):

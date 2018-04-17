@@ -10,6 +10,7 @@ CTX_NONE = 0 # no context
 CTX_WHEN = 1 # When should I remind you?
 CTX_REMINDED = 2 # I've just sent you a reminder.
 CTX_SET = 3 # You just finished setting a reminder.
+CTX_DELETED = 4 # You just deleted a reminder.
 #CTX_TIMEZONE = 2 # What's your timezone?
 # TODO count unknown messages to send a help text
 
@@ -85,12 +86,12 @@ class Conversation(object):
         return self.context == CTX_WHEN
 
     def expects_ack(self):
-        return self.is_recently_active() and self.context in (CTX_REMINDED, CTX_SET)
+        return self.is_recently_active() and self.context in (CTX_REMINDED, CTX_SET, CTX_DELETED)
 
     def set_context(self, context, reminder=None):
         assert (not reminder) or reminder.id
         reminder_id = reminder.id if reminder else None
-        if context in (CTX_NONE, CTX_REMINDED):
+        if context in (CTX_NONE, CTX_REMINDED, CTX_DELETED):
             # In CTX_REMINDED, the reminder has been deleted already.
             assert reminder_id == None
         if context in (CTX_WHEN, CTX_SET):
@@ -110,7 +111,7 @@ class Conversation(object):
         self.set_context(CTX_NONE)
 
     def clear_weak_context(self):
-        if self.context in (CTX_SET, CTX_REMINDED):
+        if self.context in (CTX_SET, CTX_REMINDED, CTX_DELETED):
             self.set_context(CTX_NONE)
 
     def set_active(self, when=None):

@@ -93,9 +93,12 @@ def process_message_inner(config, message, conv):
         return keybase.send(conv.id, response)
 
     elif msg_type == parse.MSG_UNDO:
-        conv.get_reminder().delete()
-        conv.clear_weak_context()
-        return keybase.send(conv.id, OK)
+        if conv.context == conversation.CTX_SET:
+            conv.get_reminder().delete()
+            conv.clear_weak_context()
+            return keybase.send(conv.id, OK)
+        elif conv.context == conversation.CTX_DELETED:
+            return keybase.send(conv.id, "Sorry, I don't know how to undo that.")
 
     elif msg_type == parse.MSG_SOURCE:
         conv.clear_weak_context()
@@ -175,9 +178,10 @@ def process_new_messages(config):
 def send_reminders(config):
     for reminder in reminders.get_due_reminders(config.db):
         conv = Conversation.lookup(reminder.conv_id, None, config.db)
-        keybase.send(conv.id, reminder.reminder_text())
-        print "sent a reminder for", reminder.reminder_time
-        reminder.delete()
+        if not reminder.deleted:
+            keybase.send(conv.id, reminder.reminder_text())
+            print "sent a reminder for", reminder.reminder_time
+        reminder.permadelete()
         conv.set_active()
         conv.set_context(conversation.CTX_REMINDED)
 
