@@ -92,6 +92,11 @@ def process_message_inner(config, message, conv):
             response += str(i) + ". " + reminder.body + " - " + reminder.human_time(full=True) + "\n"
         return keybase.send(conv.id, response)
 
+    elif msg_type == parse.MSG_UNDO:
+        conv.get_reminder().delete()
+        conv.clear_weak_context()
+        return keybase.send(conv.id, OK)
+
     elif msg_type == parse.MSG_SOURCE:
         conv.clear_weak_context()
         return keybase.send(conv.id, SOURCE)

@@ -18,6 +18,7 @@ MSG_LIST = 7
 MSG_SOURCE = 8
 MSG_ACK = 9
 MSG_GREETING = 10
+MSG_UNDO = 11
 # TODO MSG_SNOOZE
 # TODO MSG_CANCEL
 
@@ -183,14 +184,24 @@ def heavy_cleanup(text, botname):
 
 def try_parse_ack(text, config):
     text = heavy_cleanup(text, config.username)
-    return text in ("ok", "thanks", "thank you", "cool", "great", "okay", "done", "will do")
+    return text in ("ok", "thanks", "thank you", "cool", "great", "okay", "done", "will do",
+            "thanx", "thanku", "thankyou", "thank u")
 
 def try_parse_greeting(text, config):
     text = heavy_cleanup(text, config.username)
-    greetings = ("hi", "hello", "hey", "good morning", "good afternoon", "good evening")
+    greetings = ("hi", "hello", "hey", "hey there", "good morning", "good afternoon", "good evening")
     for g in greetings:
         if g in text:
             return g + "!"
+    return None
+
+def try_parse_undo(text, config):
+    text = heavy_cleanup(text, config.username)
+    undos = ("undo", "never ?mind", "no", "undo that", "delete that")
+    for undo in undos:
+        r = regex("(^|\s)" + undo + "($|\s)")
+        if r.search(text):
+            return True
     return None
 
 def parse_message(message, conv, config):
@@ -218,6 +229,10 @@ def parse_message(message, conv, config):
     if conv.is_strong_context():
         if try_parse_stfu(message.text):
             return (MSG_STFU, None)
+
+    if conv.context == conversation.CTX_SET:
+        if try_parse_undo(message.text, config):
+            return (MSG_UNDO, None)
 
     source = try_parse_source(message.text)
     if source is not None:

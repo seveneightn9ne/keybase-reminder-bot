@@ -170,12 +170,14 @@ class TestBot(unittest.TestCase):
         self.message_test("stfu", bot.OK, mockKeybaseSend)
         self.message_test("unparsable", bot.UNKNOWN, mockKeybaseSend)
 
-    def test_no_stfu(self, mockNow, mockRandom, mockKeybaseSend):
+    def test_undo(self, mockNow, mockRandom, mockKeybaseSend):
         self.message_test(
                 "remind me to foo tomorrow",
                 "Ok! I'll remind you to foo on Monday at 09:02 PM", mockKeybaseSend)
-        self.message_test("nevermind", bot.UNKNOWN, mockKeybaseSend)
-
+        self.message_test("nevermind", bot.OK, mockKeybaseSend)
+        mockNow.return_value = NOW_UTC + datetime.timedelta(days=1)
+        bot.send_reminders(self.config)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.OK) # no reminder sent
 
 if __name__ == '__main__':
     unittest.main()
