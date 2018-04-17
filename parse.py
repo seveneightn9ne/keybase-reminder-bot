@@ -215,8 +215,9 @@ def parse_message(message, conv, config):
     if try_parse_list(message.text):
         return (MSG_LIST, None)
 
-    if try_parse_stfu(message.text):
-        return (MSG_STFU, None)
+    if conv.is_strong_context():
+        if try_parse_stfu(message.text):
+            return (MSG_STFU, None)
 
     source = try_parse_source(message.text)
     if source is not None:

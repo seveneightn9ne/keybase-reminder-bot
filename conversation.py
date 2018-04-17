@@ -80,6 +80,10 @@ class Conversation(object):
         return self.last_active_time and \
                 (util.now_utc() - self.last_active_time).total_seconds() < 60 * MINUTES
 
+    # A context where the bot will engage with you until you answer correctly.
+    def is_strong_context(self):
+        return self.context == CTX_WHEN
+
     def expects_ack(self):
         return self.is_recently_active() and self.context in (CTX_REMINDED, CTX_SET)
 

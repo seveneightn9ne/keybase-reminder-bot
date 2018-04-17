@@ -163,5 +163,19 @@ class TestBot(unittest.TestCase):
         # Asserts that bot didn't send any message since the reminder
         self.message_test("thanks", ":bell: *Reminder:* foo", mockKeybaseSend)
 
+    def test_stfu(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test("remind me to foo", bot.WHEN, mockKeybaseSend)
+        self.message_test("unparsable", bot.HELP_WHEN, mockKeybaseSend)
+        self.message_test("unparsable", bot.HELP_WHEN, mockKeybaseSend)
+        self.message_test("stfu", bot.OK, mockKeybaseSend)
+        self.message_test("unparsable", bot.UNKNOWN, mockKeybaseSend)
+
+    def test_no_stfu(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test(
+                "remind me to foo tomorrow",
+                "Ok! I'll remind you to foo on Monday at 09:02 PM", mockKeybaseSend)
+        self.message_test("nevermind", bot.UNKNOWN, mockKeybaseSend)
+
+
 if __name__ == '__main__':
     unittest.main()
