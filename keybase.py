@@ -71,23 +71,44 @@ def send(conv_id, text):
     call("send", {"options": {"conversation_id": conv_id, "message": {"body": text}}})
     return True
 
+def debug(message, config):
+    if config.debug_team and config.debug_topic:
+        call("send", {"options": {"channel": {
+            "name": config.debug_team,
+            "members_type": "team",
+            "topic_name": config.debug_topic},
+            "message": {"body": message}}})
+    else:
+        print >> sys.stderr, "[DEBUG]", message
+
 def _status():
     proc = subprocess.Popen(['keybase','status', '-j'], stdout=PIPE)
     out, err = proc.communicate()
     return json.loads(out)
 
-def setup(username):
+def setup(config):
     status = _status()
     logged_in = status["Username"]
     if not status["LoggedIn"]:
         try:
-            subprocess.check_call(['keybase', 'login', username])
+            subprocess.check_call(['keybase', 'login', config.username])
         except subprocess.CalledProcessError:
             print >> sys.stderr, "FATAL: Error during call to `keybase login " \
-                    + username + "`"
+                    + config.username + "`"
             sys.exit(1)
-    elif not logged_in == username:
+    elif not logged_in == config.username:
         print >> sys.stderr, "FATAL: Logged in to Keybase as wrong user."
-        print >> sys.stderr, "Logged in as "+logged_in+" but expected "+username+". "
+        print >> sys.stderr, "Logged in as "+logged_in+" but expected "+config.username+". "
         print >> sys.stderr, "Run `keybase logout` to log them out."
         sys.exit(1)
+
+    if config.debug_team and config.debug_topic:
+        try:
+            call("read", {"options": {"channel": {
+                "name": config.debug_team,
+                "members_type": "team",
+                "topic_name": config.debug_topic}}})
+        except Exception as e:
+            print >> sys.stderr, "Can't read from the debug channel:"
+            print >> sys.stderr, e.message
+            sys.exit(1)

@@ -38,9 +38,6 @@ class User(object):
                 c.execute('''update reminders set reminder_time=(reminder_time + ?)
                     where user=? and reminder_time not null''', (diff, self.name))
 
-
-
-
     def set_seen_help(self):
         self.has_seen_help = True
         self.save_settings()

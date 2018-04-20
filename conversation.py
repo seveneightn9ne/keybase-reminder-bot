@@ -125,6 +125,11 @@ class Conversation(object):
                     (util.to_ts(self.last_active_time), self.id))
             assert cur.rowcount == 1
 
+    def set_debug(self, val=True):
+        self.debug = val
+        with sqlite3.connect(self.db) as c:
+            c.execute('update conversations set debug=? where id=?', (val, self.id))
+
     def store(self):
         active_ts = util.to_ts(self.last_active_time) if self.last_active_time else 0
         #print "storing new conv " + self.channel

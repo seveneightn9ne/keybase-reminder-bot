@@ -19,6 +19,8 @@ MSG_SOURCE = 8
 MSG_ACK = 9
 MSG_GREETING = 10
 MSG_UNDO = 11
+MSG_DEBUG = 12
+MSG_NODEBUG = 13
 # TODO MSG_SNOOZE
 # TODO MSG_CANCEL
 
@@ -252,6 +254,12 @@ def try_parse_delete_by_idx(text):
     # TODO
     pass
 
+def try_parse_debug(text):
+    return text == "#debug"
+
+def try_parse_nodebug(text):
+    return text == "#nodebug"
+
 def parse_message(message, conv, config):
     reminder = try_parse_reminder(message)
     if reminder:
@@ -292,6 +300,12 @@ def parse_message(message, conv, config):
     greeting = try_parse_greeting(message.text, config)
     if not conv.is_recently_active() and greeting is not None:
         return (MSG_GREETING, greeting)
+
+    if try_parse_debug(message.text):
+        return (MSG_DEBUG, None)
+
+    if try_parse_nodebug(message.text):
+        return (MSG_NODEBUG, None)
 
     return (MSG_UNKNOWN, None)
 

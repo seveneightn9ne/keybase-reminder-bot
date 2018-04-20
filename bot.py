@@ -29,9 +29,13 @@ HELP = """*help* _shows this message._
 *remind me [when] to [what]* or *remind me to [what] [when]* _set a reminder._
 *list* _show upcoming reminders._
 *set my timezone to [tz]* _sets your timezone. This changes when any upcoming reminders will happen._
+*#debug* _turns on debug mode -- reports verbose errors including your message text._
+*#nodebug* _turns off debug mode._
 
 In general, if I didn't understand, I'll ask for clarification.
 If you have any feedback or suggestions, @%s would love to hear them."""
+DEBUG = "Thanks! Now I'll log verbose error messages in this conversation. say #nodebug to turn it off."
+NODEBUG = "Ok! Debug mode is off now."
 
 # Returns True iff I interacted with the user.
 def process_message_inner(config, message, conv):
@@ -116,9 +120,20 @@ def process_message_inner(config, message, conv):
         conv.clear_weak_context()
         return keybase.send(conv.id, data)
 
+    elif msg_type == parse.MSG_DEBUG:
+        conv.set_debug(True)
+        return keybase.send(conv.id, DEBUG)
+
+    elif msg_type == parse.MSG_NODEBUG:
+        conv.set_debug(False)
+        return keybase.send(conv.id, NODEBUG)
+
     elif msg_type == parse.MSG_UNKNOWN:
         # I don't think an unknown message should clear context at all
         #conv.clear_weak_context()
+        if conv.debug:
+            keybase.debug("Message from @" + message.user().name + " parsed UNKNOWN: " \
+                    + message.text, config)
         if conv.context == conversation.CTX_WHEN:
             return keybase.send(conv.id, HELP_WHEN)
         else: # CTX_NONE/weak
@@ -147,6 +162,9 @@ def process_new_messages(config):
     for conv_json in unread_convs:
         id = conv_json["id"]
         conv = Conversation.lookup(id, conv_json, config.db)
+        if conv.channel == config.debug_team:
+            # Don't do anything in the debug team
+            continue
         params = {"options": {
                 "conversation_id": id,
                 "unread_only": True}}
@@ -163,11 +181,16 @@ def process_new_messages(config):
                 continue
             try:
                 process_message(config, keybase.Message(id, message, config.db), conv)
-            except:
+            except Exception as e:
                 keybase.send(id,
-                        "Ugh! I crashed! You can complain to @" + config.owner + ".")
+                        "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
+                keybase.debug("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+                if conv.debug:
+                    text = message["msg"]["content"]["text"]["body"]
+                    from_u = message["msg"]["sender"]["username"]
+                    keybase.debug("The message, sent by @" + from_u + " was: " + text, config)
                 conv.set_context(conversation.CTX_NONE)
-                raise
+                raise e
 
 def send_reminders(config):
     for reminder in reminders.get_due_reminders(config.db):
@@ -180,10 +203,12 @@ def send_reminders(config):
         conv.set_context(conversation.CTX_REMINDED)
 
 class Config(object):
-    def __init__(self, db, username, owner):
+    def __init__(self, db, username, owner, debug_team=None, debug_topic=None):
         self.db = db
         self.username = username
         self.owner = owner
+        self.debug_team = debug_team
+        self.debug_topic = debug_topic
 
     @classmethod
     def fromFile(cls, configFile):
@@ -192,10 +217,12 @@ class Config(object):
         db = config['database']['file']
         username = config['keybase']['username']
         owner = config['keybase']['owner']
-        return Config(db, username, owner)
+        debug_team = config['keybase']['debug_team'] or None
+        debug_topic = config['keybase']['debug_topic'] or None
+        return Config(db, username, owner, debug_team, debug_topic)
 
 def setup(config):
-    keybase.setup(config.username)
+    keybase.setup(config)
     database.setup(config.db)
 
 if __name__ == "__main__":
