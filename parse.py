@@ -23,33 +23,66 @@ MSG_UNDO = 11
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):
-
     def fixup_times(when_str, relative_base):
         # When there is no explicit AM/PM assume the next upcoming one
-        # HH:(MM)? (AM|PM)?
-        time_regex = regex('(?:[^\w]|^)(\d\d?(:\d\d)?)\s?([ap]\.?m.?)?')
-        results = re.findall(time_regex, when_str)
-        times = [(m[0], m[1]) for m in results if m[2] == '']
-        if len(times) != 1:
-            # I don't expect to find more than one time. Rather not do anything.
-            return when_str
+        # H:MM (AM|PM)?
 
-        time_to_replace, minutes = times[0]
-        for fmt in ('%I', '%I:%M'):
-            try:
-                time = datetime.strptime(time_to_replace, fmt)
-                break
-            except ValueError:
-                pass
-        else:
-            return when_str # Couldn't parse a time
+        def hhmm_explicit_ampm(when_str, relative_base):
+            # looks for HH:MM without an AM or PM and adds 12 to the HH if necessary.
+            # Returns str if the returned str is good to go, None if it's not fixed.
+            time_with_minutes = regex('(?:[^\w]|^)(\d\d?(:\d\d))(\s?[ap]\.?m)?')
+            results = re.findall(time_with_minutes, when_str)
+            if len(results) != 1:
+                # I don't expect to find more than one time. Rather not do anything.
+                return None
+            time_match, mins_match, ampm_match = results[0]
+            if ampm_match:
+                # AM/PM is explicit
+                return when_str
 
-        if time.hour > 12:
-            return # you explicitly are after noon
+            time = datetime.strptime(time_match, '%I:%M')
 
-        if relative_base.hour > time.hour:
-            new_hour = str(time.hour + 12)
-            return when_str.replace(time_to_replace, new_hour + minutes)
+            if time.hour > 12:
+                return when_str # you explicitly are after noon e.g. 23:00
+
+            if relative_base.hour > time.hour:
+                new_hour = str(time.hour + 12)
+                return when_str.replace(time_match, new_hour + mins_match)
+
+            return None
+
+        def at_hh_explicit_ampm(when_str, relative_base):
+            # looks for "at HH" without AM/PM and adds 12 to HH and :00 if necessary.
+            at_hh_regex = regex('(?:(?:^|\s)at\s|^)(\d\d?)($|\s?[ap]\.?m\.?(?:$|[^\w]))')
+            results = re.findall(at_hh_regex, when_str)
+            if len(results) != 1:
+                # I don't expect to find more than one time. Rather not do anything.
+                return None
+            hour_match, ampm_match = results[0]
+            when_with_minutes = when_str.replace(hour_match, hour_match + ":00")
+            if ampm_match:
+                # AM/PM is explicit
+                return when_with_minutes
+
+            time = datetime.strptime(hour_match, '%I')
+
+            if time.hour > 12:
+                return when_with_minutes # you explicitly are after noon e.g. 23:00
+
+            if relative_base.hour > time.hour:
+                new_hour = str(time.hour + 12)
+                return when_with_minutes.replace(hour_match, new_hour)
+
+            return when_with_minutes
+
+        new_when = hhmm_explicit_ampm(when_str, relative_base)
+        if new_when:
+            return new_when
+        new_when = at_hh_explicit_ampm(when_str, relative_base)
+        if new_when:
+            return new_when
+        # else... none of the fixes worked
+        return when_str
 
     # include RELATIVE_BASE explicitly so we can mock now in tests
     local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
@@ -73,7 +106,7 @@ def try_parse_reminder(message):
     def split_reminder_when(text):
         time_phrases = [regex("(.*)(" + p + ".*)") for p in (" every ", " today", " tomorrow",
             " next ", " sunday", " monday", " tuesday", " wednesday", " thursday", " friday",
-            "saturday", " at ", " on ")]
+            "saturday", " at ", " on ", " in ")]
         possible_whens = [] #(int, reminder, datetime) tuples
 
         for time_phrase in time_phrases:
