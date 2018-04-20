@@ -117,20 +117,14 @@ def process_message_inner(config, message, conv):
         return keybase.send(conv.id, data)
 
     elif msg_type == parse.MSG_UNKNOWN:
-        conv.clear_weak_context()
+        # I don't think an unknown message should clear context at all
+        #conv.clear_weak_context()
         if conv.context == conversation.CTX_WHEN:
             return keybase.send(conv.id, HELP_WHEN)
-        else: # CTX_NONE
-            if conv.is_recently_active():
-                # we're in the middle of a conversation
+        else: # CTX_NONE/weak
+            if conv.is_recently_active() or message.user().has_seen_help:
                 return keybase.send(conv.id, UNKNOWN)
-            if not message.is_private_channel():
-                # assume you weren't talking to me..
-                return False
-            if not message.user().has_seen_help:
-                return keybase.send(conv.id, PROMPT_HELP)
-            # TODO not sure what to do here. I'll ignore it for now
-            return False
+            return keybase.send(conv.id, PROMPT_HELP)
 
     # Shouldn't be able to get here
     print msg_type, data
