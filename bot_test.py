@@ -224,5 +224,42 @@ class TestBot(unittest.TestCase):
         bot.send_reminders(self.config)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.OK) # no reminder sent
 
+    def test_snooze_for(self, mockNow, mockRandom, mockKeybaseSend):
+        reminder = "get groceries"
+        self.reminder_test(
+            "remind me to get groceries tomorrow at 8am",
+            reminder, "at 8:00 AM",
+            "on Monday April 9 2018 at 8:00 AM",
+            datetime.timedelta(days=1),
+            mockNow, mockKeybaseSend)
+        mockKeybaseSend.reset_mock()
+        self.message_test("snooze for 12 minutes", "Ok. I'll remind you again in 12 minutes.", mockKeybaseSend)
+        mockKeybaseSend.reset_mock()
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=10)
+        bot.send_reminders(self.config)
+        assert not mockKeybaseSend.called
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=10)
+        bot.send_reminders(self.config)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* " + reminder)
+
+    # Snooze with a default of 10 minutes when the user doesn't specify a duration.
+    def test_snooze(self, mockNow, mockRandom, mockKeybaseSend):
+        reminder = "get groceries"
+        self.reminder_test(
+            "remind me to get groceries tomorrow at 8am",
+            reminder, "at 8:00 AM",
+            "on Monday April 9 2018 at 8:00 AM",
+            datetime.timedelta(days=1),
+            mockNow, mockKeybaseSend)
+        mockKeybaseSend.reset_mock()
+        self.message_test("snooze", "Ok. I'll remind you again in 10 minutes.", mockKeybaseSend)
+        mockKeybaseSend.reset_mock()
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=8)
+        bot.send_reminders(self.config)
+        assert not mockKeybaseSend.called
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=4)
+        bot.send_reminders(self.config)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* " + reminder)
+
 if __name__ == '__main__':
     unittest.main()

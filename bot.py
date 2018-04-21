@@ -128,6 +128,13 @@ def process_message_inner(config, message, conv):
         conv.set_debug(False)
         return keybase.send(conv.id, NODEBUG)
 
+    elif msg_type == parse.MSG_SNOOZE:
+        if conv.context != conversation.CTX_REMINDED:
+            return keybase.send(conv.id, "Not sure what to snooze.")
+        conv.get_reminder().snooze_until(data.time)
+        conv.clear_weak_context()
+        return keybase.send(conv.id, "Ok. I'll remind you again in " + data.phrase + ".")
+
     elif msg_type == parse.MSG_UNKNOWN:
         # I don't think an unknown message should clear context at all
         #conv.clear_weak_context()
@@ -143,7 +150,7 @@ def process_message_inner(config, message, conv):
 
     # Shouldn't be able to get here
     print msg_type, data
-    assert False
+    assert False, "unexpected parsed msg_type"
 
 def process_message(config, message, conv):
     active, unknown_msg = process_message_inner(config, message, conv)
@@ -205,12 +212,11 @@ def process_new_messages(config):
 def send_reminders(config):
     for reminder in reminders.get_due_reminders(config.db):
         conv = Conversation.lookup(reminder.conv_id, None, config.db)
-        if not reminder.deleted:
-            keybase.send(conv.id, reminder.reminder_text())
-            print "sent a reminder for", reminder.reminder_time
-        reminder.permadelete()
+        keybase.send(conv.id, reminder.reminder_text())
+        print "sent a reminder for", reminder.reminder_time
+        reminder.delete()
         conv.set_active()
-        conv.set_context(conversation.CTX_REMINDED)
+        conv.set_context(conversation.CTX_REMINDED, reminder)
 
 class Config(object):
     def __init__(self, db, username, owner, debug_team=None, debug_topic=None):

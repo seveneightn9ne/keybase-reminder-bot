@@ -6,6 +6,7 @@ import conversation, util
 from reminders import Reminder
 from user import User
 from datetime import datetime # don't use anything that uses now.
+from collections import namedtuple
 
 MSG_UNKNOWN = 0
 MSG_REMINDER = 1
@@ -21,7 +22,7 @@ MSG_GREETING = 10
 MSG_UNDO = 11
 MSG_DEBUG = 12
 MSG_NODEBUG = 13
-# TODO MSG_SNOOZE
+MSG_SNOOZE = 14
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):
@@ -270,6 +271,21 @@ def try_parse_debug(text):
 def try_parse_nodebug(text):
     return text == "#nodebug"
 
+SnoozeData = namedtuple("SnoozeData", ["phrase", "time"])
+
+def try_parse_snooze(text, user, config):
+    text = heavy_cleanup(text, config.username)
+    match = regex(r"^snooze for (.*)$").match(text)
+    if not match and text != "snooze":
+        return None
+    if match:
+        phrase = match.group(1)
+    else:
+        phrase = "10 minutes"
+    t = try_parse_when("in " + phrase, user)
+    if t:
+        return SnoozeData(phrase, t)
+
 def parse_message(message, conv, config):
     reminder = try_parse_reminder(message)
     if reminder:
@@ -316,6 +332,10 @@ def parse_message(message, conv, config):
 
     if try_parse_nodebug(message.text):
         return (MSG_NODEBUG, None)
+
+    data = try_parse_snooze(message.text, message.user(), config)
+    if data:
+        return (MSG_SNOOZE, data)
 
     return (MSG_UNKNOWN, None)
 
