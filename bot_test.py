@@ -63,8 +63,8 @@ class TestBot(unittest.TestCase):
     def test_set_reminder(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me to foo tomorrow",
-                "foo", "on Monday at 09:02 PM",
-                "on Monday April 09 2018 at 09:02 PM",
+                "foo", "on Monday at 9:02 PM",
+                "on Monday April 9 2018 at 9:02 PM",
                 datetime.timedelta(days=1),
                 mockNow, mockKeybaseSend)
 
@@ -73,7 +73,7 @@ class TestBot(unittest.TestCase):
         self.reminder_test(
                 "remind me to paint dan's fence at 10:30pm today",
                 "paint dan's fence", "at 10:30 PM",
-                "on Sunday April 08 2018 at 10:30 PM",
+                "on Sunday April 8 2018 at 10:30 PM",
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
@@ -81,7 +81,7 @@ class TestBot(unittest.TestCase):
         self.reminder_test(
                 "remind me to paint dan's fence at 10:30",
                 "paint dan's fence", "at 10:30 PM",
-                "on Sunday April 08 2018 at 10:30 PM",
+                "on Sunday April 8 2018 at 10:30 PM",
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
@@ -89,15 +89,15 @@ class TestBot(unittest.TestCase):
         self.reminder_test(
                 "remind me to paint dan's fence today at 10:30pm",
                 "paint dan's fence", "at 10:30 PM",
-                "on Sunday April 08 2018 at 10:30 PM",
+                "on Sunday April 8 2018 at 10:30 PM",
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
     def test_set_reminder_pre_when(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me tuesday 8am to eat a quiche",
-                "eat a quiche", "on Tuesday at 08:00 AM",
-                "on Tuesday April 10 2018 at 08:00 AM",
+                "eat a quiche", "on Tuesday at 8:00 AM",
+                "on Tuesday April 10 2018 at 8:00 AM",
                 datetime.timedelta(days=2),
                 mockNow, mockKeybaseSend)
 
@@ -112,16 +112,16 @@ class TestBot(unittest.TestCase):
     def test_reminder_listen(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me at 7:45 to listen to big song on speakers",
-                "listen to big song on speakers", "on Monday at 07:45 PM",
-                "on Monday April 09 2018 at 07:45 PM",
+                "listen to big song on speakers", "on Monday at 7:45 PM",
+                "on Monday April 9 2018 at 7:45 PM",
                 datetime.timedelta(days=1),
                 mockNow, mockKeybaseSend)
 
     def test_reminder_relative(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me to foo in 30 minutes.",
-                "foo", "at 09:32 PM",
-                "on Sunday April 08 2018 at 09:32 PM",
+                "foo", "at 9:32 PM",
+                "on Sunday April 8 2018 at 9:32 PM",
                 datetime.timedelta(minutes=31),
                 mockNow, mockKeybaseSend)
 
@@ -129,7 +129,7 @@ class TestBot(unittest.TestCase):
         self.reminder_test(
                 "remind me to foo at 11",
                 "foo", "at 11:00 PM",
-                "on Sunday April 08 2018 at 11:00 PM",
+                "on Sunday April 8 2018 at 11:00 PM",
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
@@ -138,7 +138,7 @@ class TestBot(unittest.TestCase):
         self.reminder_test(
                 "remind me to foo at 11",
                 "foo", "at 11:00 AM",
-                "on Monday April 09 2018 at 11:00 AM",
+                "on Monday April 9 2018 at 11:00 AM",
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
@@ -149,7 +149,7 @@ class TestBot(unittest.TestCase):
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
         self.message_test("10pm", "Ok! I'll remind you to say hello at 10:00 PM", mockKeybaseSend)
         self.message_test("List", "Here are your upcoming reminders:\n\n"
-                "1. say hello - on Sunday April 08 2018 at 10:00 PM\n", mockKeybaseSend)
+                "1. say hello - on Sunday April 8 2018 at 10:00 PM\n", mockKeybaseSend)
 
         mockNow.return_value = NOW_UTC + datetime.timedelta(hours=1)
         bot.send_reminders(self.config)
@@ -161,16 +161,16 @@ class TestBot(unittest.TestCase):
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
         self.message_test("set my timezone to US/Pacific", bot.ACK_WHEN, mockKeybaseSend)
         self.message_test("tomorrow at 9am",
-                "Ok! I'll remind you to foo at 09:00 AM", mockKeybaseSend)
+                "Ok! I'll remind you to foo at 9:00 AM", mockKeybaseSend)
 
     def test_set_timezone_after_reminder(self, mockNow, mockRandom, mockKeybaseSend):
 
         self.message_test("remind me to foo tomorrow at 9am",
-                "Ok! I'll remind you to foo at 09:00 AM", mockKeybaseSend)
+                "Ok! I'll remind you to foo at 9:00 AM", mockKeybaseSend)
         mockKeybaseSend.assert_any_call(TEST_CONV_ID, bot.ASSUME_TZ)
         self.message_test("set my timezone to US/Pacific.", bot.ACK, mockKeybaseSend)
         self.message_test("list my reminders", "Here are your upcoming reminders:\n\n"
-                "1. foo - on Monday April 09 2018 at 09:00 AM\n", mockKeybaseSend)
+                "1. foo - on Monday April 9 2018 at 9:00 AM\n", mockKeybaseSend)
 
     def test_parse_source(self, mockNow, mockRandom, mockKeybaseSend):
         self.message_test(" What are you made of", bot.SOURCE, mockKeybaseSend)
@@ -190,8 +190,8 @@ class TestBot(unittest.TestCase):
     def test_ack(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me to foo tomorrow",
-                "foo", "on Monday at 09:02 PM",
-                "on Monday April 09 2018 at 09:02 PM",
+                "foo", "on Monday at 9:02 PM",
+                "on Monday April 9 2018 at 9:02 PM",
                 datetime.timedelta(days=1),
                 mockNow, mockKeybaseSend)
         # Asserts that bot didn't send any message since the reminder
@@ -207,7 +207,7 @@ class TestBot(unittest.TestCase):
     def test_undo(self, mockNow, mockRandom, mockKeybaseSend):
         self.message_test(
                 "remind me to foo tomorrow",
-                "Ok! I'll remind you to foo on Monday at 09:02 PM", mockKeybaseSend)
+                "Ok! I'll remind you to foo on Monday at 9:02 PM", mockKeybaseSend)
         self.message_test("nevermind", bot.OK, mockKeybaseSend)
         mockNow.return_value = NOW_UTC + datetime.timedelta(days=1)
         bot.send_reminders(self.config)

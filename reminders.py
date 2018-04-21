@@ -104,10 +104,10 @@ class Reminder(object):
         if needs_date:
             fmt += "on %A " # on Monday
             if needs_day:
-                fmt += "%B %d " # April 10
+                fmt += "%B %-d " # April 10
             if needs_year:
                 fmt += "%Y " # 2018
-        fmt += "at %I:%M %p" # at 10:30 AM
+        fmt += "at %-I:%M %p" # at 10:30 AM
         if not user_tz:
             fmt += " %Z" # EDT or EST
         # TODO maybe this (or something nearby) will throw pytz.exceptions.AmbiguousTimeError
