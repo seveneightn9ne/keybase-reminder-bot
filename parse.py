@@ -235,7 +235,7 @@ def try_parse_greeting(text, config):
 
 def try_parse_undo(text, config):
     text = heavy_cleanup(text, config.username)
-    undos = ("undo", "never ?mind", "no", "undo that", "delete that")
+    undos = ("undo", "never ?mind", "no", "undo that", "delete that", "nvm")
     for undo in undos:
         r = regex("(^|\s)" + undo + "($|\s)")
         if r.search(text):

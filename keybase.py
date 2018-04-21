@@ -69,7 +69,7 @@ def call(method, params=None):
 
 def send(conv_id, text):
     call("send", {"options": {"conversation_id": conv_id, "message": {"body": text}}})
-    return True
+    return True, None
 
 def debug(message, config):
     if config.debug_team and config.debug_topic:

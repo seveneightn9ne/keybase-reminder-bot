@@ -43,7 +43,7 @@ def process_message_inner(config, message, conv):
             and not config.username in message.text \
             and conv.context == conversation.CTX_NONE:
         print "Ignoring message not for me"
-        return False
+        return False, None
 
     # TODO need some sort of onboarding for first-time user
 
@@ -114,7 +114,7 @@ def process_message_inner(config, message, conv):
 
     elif msg_type == parse.MSG_ACK:
         conv.clear_weak_context()
-        return True
+        return True, None
 
     elif msg_type == parse.MSG_GREETING:
         conv.clear_weak_context()
@@ -135,19 +135,22 @@ def process_message_inner(config, message, conv):
             keybase.debug("Message from @" + message.user().name + " parsed UNKNOWN: " \
                     + message.text, config)
         if conv.context == conversation.CTX_WHEN:
+            return True, HELP_WHEN
             return keybase.send(conv.id, HELP_WHEN)
         else: # CTX_NONE/weak
             if conv.is_recently_active() or message.user().has_seen_help:
-                return keybase.send(conv.id, UNKNOWN)
-            return keybase.send(conv.id, PROMPT_HELP)
+                return True, UNKNOWN
+            return True, PROMPT_HELP
 
     # Shouldn't be able to get here
     print msg_type, data
     assert False
 
 def process_message(config, message, conv):
-    if process_message_inner(config, message, conv):
+    active, unknown_msg = process_message_inner(config, message, conv)
+    if active:
         conv.set_active()
+    return unknown_msg
 
 def process_new_messages(config):
     results = keybase.call("list")
@@ -170,6 +173,8 @@ def process_new_messages(config):
                 "unread_only": True}}
         response = keybase.call("read", params)
         #print "other response", response
+        sent_resp = False
+        resp_to_send = None
         for message in reversed(response["messages"]):
             if "error" in message:
                 print "message error: {}".format(message["error"])
@@ -180,7 +185,11 @@ def process_new_messages(config):
                 print "ignoring message of type: {}".format(message["msg"]["content"]["type"])
                 continue
             try:
-                process_message(config, keybase.Message(id, message, config.db), conv)
+                resp = process_message(config, keybase.Message(id, message, config.db), conv)
+                if resp is None:
+                    sent_resp = True
+                elif resp_to_send is None:
+                    resp_to_send = resp
             except Exception as e:
                 keybase.send(id,
                         "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
@@ -191,6 +200,8 @@ def process_new_messages(config):
                     keybase.debug("The message, sent by @" + from_u + " was: " + text, config)
                 conv.set_context(conversation.CTX_NONE)
                 raise e
+        if not sent_resp and resp_to_send is not None:
+            keybase.send(conv.id, resp_to_send)
 
 def send_reminders(config):
     for reminder in reminders.get_due_reminders(config.db):
