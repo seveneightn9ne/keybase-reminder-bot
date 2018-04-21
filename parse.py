@@ -98,6 +98,8 @@ def try_parse_when(when, user):
             'RETURN_AS_TIMEZONE_AWARE': True,
             'RELATIVE_BASE': relative_base}
     dt = dateparser.parse(when, settings=parse_date_settings)
+    if dt != None and (dt - util.now_utc()).total_seconds() < 0:
+        return None
     return dt
 
 def regex(s):

@@ -163,6 +163,9 @@ class TestBot(unittest.TestCase):
         bot.send_reminders(self.config)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* say hello")
 
+    def test_set_reminder_not_before_now(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test("Remind me to say hello on January 1 2017", bot.WHEN, mockKeybaseSend)
+
     def test_set_timezone_during_when(self, mockNow, mockRandom, mockKeybaseSend):
 
         self.message_test("remind me to foo", bot.WHEN, mockKeybaseSend)
