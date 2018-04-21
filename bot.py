@@ -136,7 +136,6 @@ def process_message_inner(config, message, conv):
                     + message.text, config)
         if conv.context == conversation.CTX_WHEN:
             return True, HELP_WHEN
-            return keybase.send(conv.id, HELP_WHEN)
         else: # CTX_NONE/weak
             if conv.is_recently_active() or message.user().has_seen_help:
                 return True, UNKNOWN

@@ -130,16 +130,18 @@ def try_parse_reminder(message):
         return reminder_text, when
 
     user = message.user()
-    reminder2 = regex("remind me (.*?) to (.*)")
-    match = reminder2.search(message.text)
     reminder_without_when = None
-    if match:
-        reminder_text = match.group(2)
-        when = try_parse_when(match.group(1), user)
-        if when:
-            return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
-        else:
-            reminder_without_when = reminder_text
+    reminder2s = [regex(p) for p in ("remind me (.*?) to (.*)", "reminder (.*?) to (.*)")]
+    for reminder2 in reminder2s:
+        match = reminder2.search(message.text)
+        if match:
+            reminder_text = match.group(2)
+            when = try_parse_when(match.group(1), user)
+            if when:
+                return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
+            else:
+                reminder_without_when = reminder_text
+            break
 
     start_phrases = [regex(p + "(.*)") for p in ("remind me to ", "reminder to ")]
     for start_phrase in start_phrases:

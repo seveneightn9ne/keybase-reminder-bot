@@ -17,7 +17,7 @@ TEST_CONV_JSON = {"id": TEST_CONV_ID, "channel": TEST_CHANNEL_JSON}
 NOW_TS = 1523235748.0 # Sunday April 8 2018, 21:02:28 EDT. Monday April 9 2018, 01:02:28 UTC.
 NOW_UTC = datetime.datetime.fromtimestamp(NOW_TS, tz=pytz.utc)
 
-@patch('keybase.send', return_value=True)
+@patch('keybase.send', return_value=(True, None))
 @patch('random.choice', side_effect=lambda i: i[0])
 @patch('util.now_utc', return_value=NOW_UTC)
 class TestBot(unittest.TestCase):
@@ -39,8 +39,9 @@ class TestBot(unittest.TestCase):
     def message_test(self, incoming, outgoing, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
         message = keybase.Message.inject(incoming, TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
-        bot.process_message(self.config, message, conv)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, outgoing)
+        resp = bot.process_message(self.config, message, conv)
+        if not resp == outgoing:
+            mockKeybaseSend.assert_called_with(TEST_CONV_ID, outgoing)
 
     def test_recent_message(self, mockNow, mockRandom, mockKeybaseSend):
         # When bot receives two messages in a row, it shouldn't send the full help message twice.
@@ -142,6 +143,13 @@ class TestBot(unittest.TestCase):
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
+    def test_reminder_3(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "set a reminder in 20 minutes to foo",
+                "foo", "at 9:22 PM",
+                "on Sunday April 8 2018 at 9:22 PM",
+                datetime.timedelta(minutes=21),
+                mockNow, mockKeybaseSend)
 
     def test_set_reminder_separate_when(self, mockNow, mockRandom, mockKeybaseSend):
 
