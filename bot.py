@@ -227,8 +227,8 @@ class Config(object):
         db = config['database']['file']
         username = config['keybase']['username']
         owner = config['keybase']['owner']
-        debug_team = config['keybase']['debug_team'] or None
-        debug_topic = config['keybase']['debug_topic'] or None
+        debug_team = config['keybase'].get('debug_team', None)
+        debug_topic = config['keybase'].get('debug_topic', None)
         return Config(db, username, owner, debug_team, debug_topic)
 
 def setup(config):
@@ -254,6 +254,7 @@ if __name__ == "__main__":
     setup(config)
 
     print "ReminderBot is running..."
+    print "username: " + config.username
 
     running = True
     def signal_handler(signal, frame):

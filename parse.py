@@ -226,8 +226,14 @@ def heavy_cleanup(text, botname):
 
 def try_parse_ack(text, config):
     text = heavy_cleanup(text, config.username)
-    return text in ("ok", "thanks", "thank you", "cool", "great", "okay", "done", "will do",
+    acks = ("ok", "k", "thanks", "thx", "thank you", "cool", "great", "okay", "done", "will do",
             "thanx", "thanku", "thankyou", "thank u")
+    if text in acks:
+        return True
+    words = re.split(r"\W+", text)
+    if all(word in acks for word in words):
+        return True
+    return None
 
 def try_parse_greeting(text, config):
     text = heavy_cleanup(text, config.username)
