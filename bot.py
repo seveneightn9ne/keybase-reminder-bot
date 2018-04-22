@@ -265,6 +265,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
 
     while running:
+        sys.stdout.flush()
+        sys.stderr.flush()
         try:
             process_new_messages(config)
         except:
