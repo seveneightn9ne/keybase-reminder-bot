@@ -159,7 +159,7 @@ def process_new_messages(config):
         return
 
     unread_convs = filter(lambda conv: conv["unread"], all_convs)
-    print str(len(unread_convs)) + " unread conversations"
+    # print str(len(unread_convs)) + " unread conversations"
 
     for conv_json in unread_convs:
         id = conv_json["id"]
