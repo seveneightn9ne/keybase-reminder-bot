@@ -333,10 +333,9 @@ def parse_message(message, conv, config):
     if try_parse_nodebug(message.text):
         return (MSG_NODEBUG, None)
 
-    data = try_parse_snooze(message.text, message.user(), config)
-    if data:
-        return (MSG_SNOOZE, data)
+    if conv.context == conversation.CTX_REMINDED:
+        data = try_parse_snooze(message.text, message.user(), config)
+        if data:
+            return (MSG_SNOOZE, data)
 
     return (MSG_UNKNOWN, None)
-
-

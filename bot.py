@@ -132,7 +132,7 @@ def process_message_inner(config, message, conv):
         if conv.context != conversation.CTX_REMINDED:
             return keybase.send(conv.id, "Not sure what to snooze.")
         conv.get_reminder().snooze_until(data.time)
-        conv.clear_weak_context()
+        conv.set_context(conversation.CTX_SET, conv.get_reminder())
         return keybase.send(conv.id, "Ok. I'll remind you again in " + data.phrase + ".")
 
     elif msg_type == parse.MSG_UNKNOWN:
@@ -214,6 +214,10 @@ def send_reminders(config):
         conv = Conversation.lookup(reminder.conv_id, None, config.db)
         keybase.send(conv.id, reminder.reminder_text())
         print "sent a reminder for", reminder.reminder_time
+        # TODO: Reminders are not permanently deleted.
+        #       Because they are needed for snoozing.
+        #       Something should permanently delete reminders
+        #       after some time. For privacy and to save space.
         reminder.delete()
         conv.set_active()
         conv.set_context(conversation.CTX_REMINDED, reminder)
