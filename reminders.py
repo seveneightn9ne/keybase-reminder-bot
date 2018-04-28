@@ -64,10 +64,14 @@ class Reminder(object):
         with sqlite3.connect(self.db) as c:
             c.execute('update reminders set deleted=0 where rowid=?', (self.id,))
 
-    def permadelete(self):
+    def snooze_until(self, t):
         assert self.id is not None
+        assert t is not None
+        self.deleted = False
+        self.reminder_time = t
         with sqlite3.connect(self.db) as c:
-            c.execute('delete from reminders where rowid=?', (self.id,))
+            c.execute('UPDATE reminders SET deleted=0, reminder_time=? WHERE rowid=?',
+                      (util.to_ts(self.reminder_time), self.id,))
 
     def store(self):
         reminder_ts = util.to_ts(self.reminder_time) if self.reminder_time else None
@@ -127,7 +131,7 @@ def get_due_reminders(db):
     with sqlite3.connect(db) as c:
         c.row_factory = sqlite3.Row
         cur = c.cursor()
-        cur.execute('select rowid, * from reminders where reminder_time<=? limit 100', (now_ts,))
+        cur.execute('SELECT rowid, * FROM reminders WHERE reminder_time<=? AND deleted=0 LIMIT 100', (now_ts,))
         for row in cur:
             reminders.append(Reminder.from_row(row, db))
     return reminders

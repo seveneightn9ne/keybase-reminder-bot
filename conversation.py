@@ -91,10 +91,10 @@ class Conversation(object):
     def set_context(self, context, reminder=None):
         assert (not reminder) or reminder.id
         reminder_id = reminder.id if reminder else None
-        if context in (CTX_NONE, CTX_REMINDED, CTX_DELETED):
+        if context in (CTX_NONE, CTX_DELETED):
             # In CTX_REMINDED, the reminder has been deleted already.
             assert reminder_id == None
-        if context in (CTX_WHEN, CTX_SET):
+        if context in (CTX_WHEN, CTX_SET, CTX_REMINDED):
             assert reminder_id != None
 
         self.context = context
