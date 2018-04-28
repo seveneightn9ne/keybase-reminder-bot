@@ -8,21 +8,21 @@ from user import User
 from datetime import datetime # don't use anything that uses now.
 from collections import namedtuple
 
-MSG_UNKNOWN = 0
-MSG_REMINDER = 1
-MSG_HELP = 2
-MSG_WHEN = 3
-MSG_TIMEZONE = 4
-MSG_STFU = 5
-MSG_UNKNOWN_TZ = 6
-MSG_LIST = 7
-MSG_SOURCE = 8
-MSG_ACK = 9
-MSG_GREETING = 10
-MSG_UNDO = 11
-MSG_DEBUG = 12
-MSG_NODEBUG = 13
-MSG_SNOOZE = 14
+MSG_UNKNOWN    = "UNKNOWN"
+MSG_REMINDER   = "REMINDER"
+MSG_HELP       = "HELP"
+MSG_WHEN       = "WHEN"
+MSG_TIMEZONE   = "TIMEZONE"
+MSG_STFU       = "STFU"
+MSG_UNKNOWN_TZ = "UNKNOWN_TZ"
+MSG_LIST       = "LIST"
+MSG_SOURCE     = "SOURCE"
+MSG_ACK        = "ACK"
+MSG_GREETING   = "GREETING"
+MSG_UNDO       = "UNDO"
+MSG_DEBUG      = "DEBUG"
+MSG_NODEBUG    = "NODEBUG"
+MSG_SNOOZE     = "SNOOZE"
 # TODO MSG_CANCEL
 
 def try_parse_when(when, user):

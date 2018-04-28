@@ -41,14 +41,14 @@ NODEBUG = "Ok! Debug mode is off now."
 def process_message_inner(config, message, conv):
     if not message.is_private_channel() \
             and not config.username in message.text \
-            and conv.context == conversation.CTX_NONE:
+            and not conv.is_strong_context():
         print "Ignoring message not for me"
         return False, None
 
     # TODO need some sort of onboarding for first-time user
 
     msg_type, data = parse.parse_message(message, conv, config)
-    print "Received message parsed as " + str(msg_type)
+    print "Received message parsed as " + str(msg_type) + " in context " + str(conv.context)
     if msg_type == parse.MSG_REMINDER and message.user().timezone is None:
         keybase.send(conv.id, ASSUME_TZ)
         message.user().set_timezone("US/Eastern")
