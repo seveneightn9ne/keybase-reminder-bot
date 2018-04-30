@@ -250,17 +250,58 @@ def try_parse_undo(text, config):
             return True
     return None
 
-def try_parse_delete_by_what(text):
+delete_words = ("delete", "cancel", "undo", "remove")
+
+def try_parse_delete_by_what(text, reminders):
+    # delete the 10am reminder
+    # delete the reminder for 10am
+    # delete the reminder on tuesday
+    rs = [regex(d + "(?: the| my)? (.*) reminder") for d in delete_words]
+    rs.extend([regex(d + ".* reminder for (.*)") for d in delete_words])
+    rs.extend([regex(d + ".* reminder (" + a + " .*)") for d in delete_words \
+            for a in ("in", "at", "on")])
+    for r in rs:
+        match = r.search(text)
+        if match:
+            when_text = match.group(1)
+            when = try_parse_when(when_text)
+            if when:
+                break
+    else:
+        return None
+
+    # look for the exact time then for the following day
+    for reminder in reminders:
+        # TODO
+        pass
+
+def try_parse_delete_by_when(text, reminders):
     # TODO
     pass
 
-def try_parse_delete_by_when(text):
-    # TODO
-    pass
+def try_parse_delete_by_idx(text, reminders):
+    rs = [regex(d + " .*[^\w](\d+)") for d in delete_words]
+    for r in rs:
+        match = r.search(text)
+        if match:
+            i = int(match.group(1))
+            if 0 < i <= len(reminders):
+                return reminders[i-1]
 
-def try_parse_delete_by_idx(text):
-    # TODO
-    pass
+def try_parse_delete(text, reminders):
+    # Try when before idx because idx would incorrectly match on when
+    r = try_parse_delete_by_when(text, reminders)
+    if r:
+        return r
+
+    r = try_parse_delete_by_what(text, reminders)
+    if r:
+        return r
+
+    r = try_parse_delete_by_idx(text, reminders)
+    if r:
+        return r
+
 
 def try_parse_debug(text):
     return text == "#debug"
