@@ -70,6 +70,15 @@ class TestBot(unittest.TestCase):
                 datetime.timedelta(days=1),
                 mockNow, mockKeybaseSend)
 
+    @unittest.skip("todo")
+    def test_set_reminder_woto(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me foo tomorrow",
+                "foo", "on Monday at 9:02 PM",
+                "on Monday April 9 2018 at 9:02 PM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+
     # use separate functions for each reminder_test to reset the mocks and db
     def test_set_reminder_time_day(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(

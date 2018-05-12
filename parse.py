@@ -115,7 +115,7 @@ def try_parse_reminder(message):
         possible_whens = [] #(int, reminder, datetime) tuples
 
         for time_phrase in time_phrases:
-            match = time_phrase.search(rest)
+            match = time_phrase.search(text)
             if match:
                 reminder_text = match.group(1).strip()
                 when_text = match.group(2).strip()
@@ -128,31 +128,28 @@ def try_parse_reminder(message):
         elif len(possible_whens):
             _, reminder_text, when = max(possible_whens, key=lambda pair: pair[0])
         else:
-            reminder_text = rest
+            reminder_text = text
             when = None
         return reminder_text, when
 
+    # Order: "remind" <when> "to" <what>
     user = message.user()
     reminder_without_when = None
-    reminder2s = [regex(p) for p in ("remind me (.*?) to (.*)", "reminder (.*?) to (.*)")]
-    for reminder2 in reminder2s:
-        match = reminder2.search(message.text)
-        if match:
-            reminder_text = match.group(2)
-            when = try_parse_when(match.group(1), user)
-            if when:
-                return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
-            else:
-                reminder_without_when = reminder_text
-            break
-
-    start_phrases = [regex(p + "(.*)") for p in ("remind me to ", "reminder to ")]
-    for start_phrase in start_phrases:
-        match = start_phrase.search(message.text)
-        if match:
-            rest = match.group(1)
-            reminder_text, when = split_reminder_when(match.group(1))
+    reminder2 = regex("(?:remind me|reminder) (.*?) to (.*)")
+    match = reminder2.search(message.text)
+    if match:
+        reminder_text = match.group(2)
+        when = try_parse_when(match.group(1), user)
+        if when:
             return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
+        else:
+            reminder_without_when = reminder_text
+
+    # Order: "remind" <what> "to" <when>
+    match = regex("(?:remind me|reminder) to (.*)").search(message.text)
+    if match:
+        reminder_text, when = split_reminder_when(match.group(1))
+        return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
 
     if reminder_without_when:
         return Reminder(reminder_without_when, None, user.name, message.conv_id, message.db)
