@@ -275,7 +275,7 @@ SnoozeData = namedtuple("SnoozeData", ["phrase", "time"])
 
 def try_parse_snooze(text, user, config):
     text = heavy_cleanup(text, config.username)
-    match = regex(r"^snooze for (.*)$").match(text)
+    match = regex(r"^snooze\s+(?:for)?\s*(.*)$").match(text)
     if not match and text != "snooze":
         return None
     if match:

@@ -40,8 +40,9 @@ class TestBot(unittest.TestCase):
         conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
         message = keybase.Message.inject(incoming, TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
         resp = bot.process_message(self.config, message, conv)
-        if not resp == outgoing:
-            mockKeybaseSend.assert_called_with(TEST_CONV_ID, outgoing)
+        if resp is not None:
+            keybase.send(TEST_CONV_ID, resp)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, outgoing)
 
     def test_recent_message(self, mockNow, mockRandom, mockKeybaseSend):
         # When bot receives two messages in a row, it shouldn't send the full help message twice.
@@ -224,7 +225,7 @@ class TestBot(unittest.TestCase):
         bot.send_reminders(self.config)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, bot.OK) # no reminder sent
 
-    def test_snooze_for(self, mockNow, mockRandom, mockKeybaseSend):
+    def snooze_test(self, mockNow, mockKeybaseSend, phrase, echo, duration):
         reminder = "get groceries"
         self.reminder_test(
             "remind me to get groceries tomorrow at 8am",
@@ -233,33 +234,27 @@ class TestBot(unittest.TestCase):
             datetime.timedelta(days=1),
             mockNow, mockKeybaseSend)
         mockKeybaseSend.reset_mock()
-        self.message_test("snooze for 12 minutes", "Ok. I'll remind you again in 12 minutes.", mockKeybaseSend)
+        self.message_test(phrase, echo, mockKeybaseSend)
         mockKeybaseSend.reset_mock()
-        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=10)
+        mockNow.return_value = mockNow.return_value + duration - datetime.timedelta(minutes=1)
         bot.send_reminders(self.config)
         assert not mockKeybaseSend.called
-        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=10)
+        mockNow.return_value = mockNow.return_value + duration + datetime.timedelta(minutes=1)
         bot.send_reminders(self.config)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* " + reminder)
 
+    def test_snooze_for(self, mockNow, mockRandom, mockKeybaseSend):
+        self.snooze_test(mockNow, mockKeybaseSend, "snooze for 12 minutes",
+                         "Ok. I'll remind you again in 12 minutes.", datetime.timedelta(minutes=12))
+
     # Snooze with a default of 10 minutes when the user doesn't specify a duration.
     def test_snooze(self, mockNow, mockRandom, mockKeybaseSend):
-        reminder = "get groceries"
-        self.reminder_test(
-            "remind me to get groceries tomorrow at 8am",
-            reminder, "at 8:00 AM",
-            "on Monday April 9 2018 at 8:00 AM",
-            datetime.timedelta(days=1),
-            mockNow, mockKeybaseSend)
-        mockKeybaseSend.reset_mock()
-        self.message_test("snooze", "Ok. I'll remind you again in 10 minutes.", mockKeybaseSend)
-        mockKeybaseSend.reset_mock()
-        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=8)
-        bot.send_reminders(self.config)
-        assert not mockKeybaseSend.called
-        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=4)
-        bot.send_reminders(self.config)
-        mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* " + reminder)
+        self.snooze_test(mockNow, mockKeybaseSend, "snooze",
+                         "Ok. I'll remind you again in 10 minutes.", datetime.timedelta(minutes=10))
+
+    def test_snooze_nosep(self, mockNow, mockRandom, mockKeybaseSend):
+        self.snooze_test(mockNow, mockKeybaseSend, "snooze 25min",
+                         "Ok. I'll remind you again in 25min.", datetime.timedelta(minutes=25))
 
 if __name__ == '__main__':
     unittest.main()
