@@ -265,5 +265,35 @@ class TestBot(unittest.TestCase):
         self.snooze_test(mockNow, mockKeybaseSend, "snooze 25min",
                          "Ok. I'll remind you again in 25min.", datetime.timedelta(minutes=25))
 
+    def test_vacuum(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to foo tomorrow",
+                "foo", "on Monday at 9:02 PM",
+                "on Monday April 9 2018 at 9:02 PM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+        rows = bot.vacuum_old_reminders(self.config)
+        assert rows == 0
+        self.reminder_test(
+                "remind me to foo tomorrow",
+                "foo", "on Tuesday at 9:02 PM",
+                "on Tuesday April 10 2018 at 9:02 PM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+        rows = bot.vacuum_old_reminders(self.config)
+        assert rows == 1
+        self.message_test("snooze for 12 minutes",
+             "Ok. I'll remind you again in 12 minutes.", mockKeybaseSend)
+        rows = bot.vacuum_old_reminders(self.config)
+        assert rows == 0
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=15)
+        bot.send_reminders(self.config)
+        rows = bot.vacuum_old_reminders(self.config)
+        assert rows == 0
+        self.message_test("remind me to foo tomorrow",
+            "Ok! I'll remind you to foo on Wednesday at 9:17 PM", mockKeybaseSend)
+        rows = bot.vacuum_old_reminders(self.config)
+        assert rows == 1
+
 if __name__ == '__main__':
     unittest.main()

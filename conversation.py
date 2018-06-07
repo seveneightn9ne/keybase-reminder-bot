@@ -70,6 +70,7 @@ class Conversation(object):
             cur = c.cursor()
             cur.execute('''select rowid, * from reminders where conv_id=?
                     and reminder_time>=?
+                    and deleted=0
                     order by reminder_time''',
                     (self.id, util.to_ts(util.now_utc())))
             for row in cur:

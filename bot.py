@@ -214,13 +214,23 @@ def send_reminders(config):
         conv = Conversation.lookup(reminder.conv_id, None, config.db)
         keybase.send(conv.id, reminder.reminder_text())
         print "sent a reminder for", reminder.reminder_time
-        # TODO: Reminders are not permanently deleted.
-        #       Because they are needed for snoozing.
-        #       Something should permanently delete reminders
-        #       after some time. For privacy and to save space.
         reminder.delete()
         conv.set_active()
         conv.set_context(conversation.CTX_REMINDED, reminder)
+
+def vacuum_old_reminders(config):
+    with sqlite3.connect(config.db) as c:
+        cur = c.cursor()
+        cur.execute('''DELETE FROM reminders WHERE rowid IN (
+            SELECT reminders.rowid FROM reminders
+            INNER JOIN conversations ON reminders.conv_id = conversations.id
+            WHERE conversations.reminder_rowid != reminders.rowid
+            AND reminders.deleted = 1
+        )''')
+        rows = cur.rowcount
+        if rows > 0:
+            print "deleted", rows, "old reminders"
+    return rows
 
 class Config(object):
     def __init__(self, db, username, owner, debug_team=None, debug_topic=None):
@@ -277,25 +287,20 @@ if __name__ == "__main__":
     while running:
         sys.stdout.flush()
         sys.stderr.flush()
-        try:
-            process_new_messages(config)
-        except:
-            exc_type, value, tb = sys.exc_info()
-            traceback.print_tb(tb)
-            print >> sys.stderr, str(exc_type) + ": " + str(value)
 
-        if not running:
-            break
+        for task in (
+            process_new_messages,
+            send_reminders,
+            vacuum_old_reminders):
+            try:
+                task(config)
+            except:
+                exc_type, value, tb = sys.exc_info()
+                traceback.print_tb(tb)
+                print >> sys.stderr, str(exc_type) + ": " + str(value)
 
-        try:
-            send_reminders(config)
-        except:
-            exc_type, value, tb = sys.exc_info()
-            traceback.print_tb(tb)
-            print >> sys.stderr, str(exc_type) + ": " + str(value)
-
-        if not running:
-            break
+            if not running:
+                break
 
         time.sleep(1)
 
