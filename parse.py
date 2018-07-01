@@ -1,12 +1,13 @@
 # Parsing messages
 
-import dateparser, pytz, re
+import dateparser, itertools, nltk, pytz, re
 
 import conversation, util
 from reminders import Reminder
 from user import User
-from datetime import datetime # don't use anything that uses now.
 from collections import namedtuple
+from datetime import datetime, timedelta # don't use anything that uses now.
+from keybase import debug
 
 MSG_UNKNOWN    = "UNKNOWN"
 MSG_REMINDER   = "REMINDER"
@@ -23,7 +24,7 @@ MSG_UNDO       = "UNDO"
 MSG_DEBUG      = "DEBUG"
 MSG_NODEBUG    = "NODEBUG"
 MSG_SNOOZE     = "SNOOZE"
-# TODO MSG_CANCEL
+MSG_DELETE     = "DELETE"
 
 def try_parse_when(when, user):
     def fixup_times(when_str, relative_base):
@@ -250,55 +251,72 @@ def try_parse_undo(text, config):
             return True
     return None
 
-delete_words = ("delete", "cancel", "undo", "remove")
+delete_words = ("delete", "cancel", "undo", "remove", "clear")
+delete_patterns = [regex(d + " (.*) reminder") for d in delete_words] \
+    + [regex(d + ".* reminder (" + a + " .*)") for d in delete_words \
+        for a in ("in", "at", "on", "to", "for", "about")]
+delete_idx_patterns = [regex(d + " .*[^\w](\d+)") for d in delete_words]
 
-def try_parse_delete_by_what(text, reminders):
+def try_parse_delete_by_when_or_what(text, reminders, user):
     # delete the 10am reminder
+    # delete the meeting reminder
     # delete the reminder for 10am
+    # delete the reminder for a meeting
     # delete the reminder on tuesday
-    rs = [regex(d + "(?: the| my)? (.*) reminder") for d in delete_words]
-    rs.extend([regex(d + ".* reminder for (.*)") for d in delete_words])
-    rs.extend([regex(d + ".* reminder (" + a + " .*)") for d in delete_words \
-            for a in ("in", "at", "on")])
-    for r in rs:
+    # delete the reminder to go to work
+    # TODO: delete my next reminder
+    # TODO: delete the reminder for tomorrow/tonight/etc
+    text_matches = []
+    when_matches = []
+    for r in delete_patterns:
         match = r.search(text)
         if match:
-            when_text = match.group(1)
-            when = try_parse_when(when_text)
+            match_text = match.group(1)
+            text_matches.append(match_text)
+            when = try_parse_when(match_text, user)
             if when:
-                break
-    else:
+                when_matches.append(when)
+    
+    if len(text_matches) == len(when_matches) == 0:
         return None
 
-    # look for the exact time then for the following day
-    for reminder in reminders:
-        # TODO
-        pass
+    reminder_matches = []
+    reminder_x_when = itertools.product(reminders, when_matches)
+    reminder_x_text = itertools.product(reminders, text_matches)
 
-def try_parse_delete_by_when(text, reminders):
-    # TODO
-    pass
+    for (reminder, when) in reminder_x_when:
+        if reminder.reminder_time == when:
+            reminder_matches.append((reminder, 10))
+        elif reminder.reminder_time == when + timedelta(days=1):
+            reminder_matches.append((reminder, 5))
+
+    for (reminder, text) in reminder_x_text:
+        tagged_words = nltk.pos_tag(nltk.word_tokenize(text), tagset='universal')
+        words = [word for (word, tag) in tagged_words if tag in ["ADJ", "NOUN", "NUM", "VERB", "X"]]
+        matches = len([w for w in nltk.word_tokenize(reminder.body) if w in words])
+        if matches:
+            reminder_matches.append((reminder, matches**2))
+
+    if len(reminder_matches) == 0:
+        return None
+
+    return max(reminder_matches, lambda (w,s): s)[0]
 
 def try_parse_delete_by_idx(text, reminders):
-    rs = [regex(d + " .*[^\w](\d+)") for d in delete_words]
-    for r in rs:
+    for r in delete_idx_patterns:
         match = r.search(text)
         if match:
             i = int(match.group(1))
             if 0 < i <= len(reminders):
                 return reminders[i-1]
 
-def try_parse_delete(text, reminders):
+def try_parse_delete(message, reminders):
     # Try when before idx because idx would incorrectly match on when
-    r = try_parse_delete_by_when(text, reminders)
+    r = try_parse_delete_by_when_or_what(message.text, reminders, message.user())
     if r:
         return r
 
-    r = try_parse_delete_by_what(text, reminders)
-    if r:
-        return r
-
-    r = try_parse_delete_by_idx(text, reminders)
+    r = try_parse_delete_by_idx(message.text, reminders)
     if r:
         return r
 
@@ -328,6 +346,10 @@ def parse_message(message, conv, config):
     reminder = try_parse_reminder(message)
     if reminder:
         return (MSG_REMINDER, reminder)
+
+    reminder = try_parse_delete(message, conv.get_all_reminders())
+    if reminder:
+        return (MSG_DELETE, reminder)
 
     if "help" in message.text.lower():
         return (MSG_HELP, None)
@@ -362,7 +384,7 @@ def parse_message(message, conv, config):
         return (MSG_ACK, None)
 
     greeting = try_parse_greeting(message.text, config)
-    if not conv.is_recently_active() and greeting is not None:
+    if greeting is not None:
         return (MSG_GREETING, greeting)
 
     if try_parse_debug(message.text):
