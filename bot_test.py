@@ -315,7 +315,7 @@ class TestBot(unittest.TestCase):
 
         self.send_message("remind me to beep on Sunday", mockKeybaseSend)
         self.message_test("delete the beep reminder",
-            "Alright, I've deleted the reminder to beep that was set for 10:02 PM.", mockKeybaseSend)
+            "Alright, I've deleted the reminder to beep that was set for Sunday at 12:00 AM.", mockKeybaseSend)
 
     def test_delete_undo(self, mockNow, mockRandom, mockKeybaseSend):
         self.send_message("remind me to foo tomorrow", mockKeybaseSend)
