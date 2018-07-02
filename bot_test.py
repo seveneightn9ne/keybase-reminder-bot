@@ -308,6 +308,13 @@ class TestBot(unittest.TestCase):
         self.delete_test("delete reminder # 1", reminder, mockKeybaseSend)
         self.delete_test("delete reminder 1", reminder, mockKeybaseSend)
 
+    def test_delete_undo(self, mockNow, mockRandom, mockKeybaseSend):
+        self.send_message("remind me to foo tomorrow")
+        self.send_message("delete the foo reminder")
+        self.message_test("undo", bot.OK)
+        list_output = "Here are your upcoming reminders:\n\n1. foo - on Monday April 09 2018 at 12:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
 
 if __name__ == '__main__':
     unittest.main()
