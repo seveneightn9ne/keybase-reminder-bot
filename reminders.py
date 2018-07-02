@@ -94,7 +94,7 @@ class Reminder(object):
                 self.deleted))
             self.id = cur.lastrowid
 
-    def human_time(self, full=False):
+    def human_time(self, full=False, preposition=True):
         assert self.reminder_time is not None
         user_tz = self.get_user().timezone
         now = util.now_utc()
@@ -106,12 +106,16 @@ class Reminder(object):
         needs_year = full or (needs_day and self.reminder_time.year != now.year)
         fmt = ""
         if needs_date:
-            fmt += "on %A " # on Monday
+            if preposition:
+                fmt += "on "
+            fmt += "%A " # on Monday
             if needs_day:
                 fmt += "%B %-d " # April 10
             if needs_year:
                 fmt += "%Y " # 2018
-        fmt += "at %-I:%M %p" # at 10:30 AM
+        if needs_date or preposition:
+            fmt += "at "
+        fmt += "%-I:%M %p" # at 10:30 AM
         if not user_tz:
             fmt += " %Z" # EDT or EST
         # TODO maybe this (or something nearby) will throw pytz.exceptions.AmbiguousTimeError

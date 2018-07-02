@@ -132,7 +132,8 @@ def process_message_inner(config, message, conv):
         reminder = data
         reminder.delete()
         conv.set_context(conversation.CTX_DELETED, reminder)
-        msg = "Alright, I've deleted the reminder to " + reminder.body + " that was set for " + reminder.human_time() + "."
+        msg = "Alright, I've deleted the reminder to " + reminder.body + " that was set for " + \
+            reminder.human_time(preposition=False) + "."
         return keybase.send(conv.id, msg)
 
     elif msg_type == parse.MSG_SNOOZE:
