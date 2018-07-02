@@ -28,6 +28,7 @@ SOURCE = "I'm a bot written in python by @jessk.\n"\
 HELP = """*help* _shows this message._
 *remind me [when] to [what]* or *remind me to [what] [when]* _set a reminder._
 *list* _show upcoming reminders._
+*delete the reminder to [what]* / *delete the [when] reminder* / *delete reminder #2* / etc _delete a reminder._
 *set my timezone to [tz]* _sets your timezone. This changes when any upcoming reminders will happen._
 *#debug* _turns on debug mode -- reports verbose errors including your message text._
 *#nodebug* _turns off debug mode._
