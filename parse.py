@@ -253,7 +253,7 @@ def try_parse_undo(text, config):
 
 delete_words = ("delete", "cancel", "undo", "remove", "clear")
 delete_patterns = [regex(d + " (.*) reminder") for d in delete_words] \
-    + [regex(d + ".* reminder (" + a + " .*)") for d in delete_words \
+    + [regex(d + ".* reminder " + a + " (.*)") for d in delete_words \
         for a in ("in", "at", "on", "to", "for", "about")]
 delete_idx_patterns = [regex(d + " .*[^\w](\d+)") for d in delete_words]
 
@@ -285,7 +285,9 @@ def try_parse_delete_by_when_or_what(text, reminders, user):
     reminder_x_text = itertools.product(reminders, text_matches)
 
     for (reminder, when) in reminder_x_when:
-        if reminder.reminder_time == when:
+        print reminder.reminder_time
+        print when
+        if abs(reminder.reminder_time - when) < timedelta(minutes=1):
             reminder_matches.append((reminder, 10))
         elif reminder.reminder_time == when + timedelta(days=1):
             reminder_matches.append((reminder, 5))
@@ -300,7 +302,7 @@ def try_parse_delete_by_when_or_what(text, reminders, user):
     if len(reminder_matches) == 0:
         return None
 
-    return max(reminder_matches, lambda (w,s): s)[0]
+    return max(reminder_matches, key=lambda (w,s): s)[0]
 
 def try_parse_delete_by_idx(text, reminders):
     for r in delete_idx_patterns:
@@ -311,6 +313,10 @@ def try_parse_delete_by_idx(text, reminders):
                 return reminders[i-1]
 
 def try_parse_delete(message, reminders):
+
+    if len(reminders) == 0:
+        return None
+
     # Try when before idx because idx would incorrectly match on when
     r = try_parse_delete_by_when_or_what(message.text, reminders, message.user())
     if r:
@@ -343,13 +349,14 @@ def try_parse_snooze(text, user, config):
         return SnoozeData(phrase, t)
 
 def parse_message(message, conv, config):
-    reminder = try_parse_reminder(message)
-    if reminder:
-        return (MSG_REMINDER, reminder)
 
     reminder = try_parse_delete(message, conv.get_all_reminders())
     if reminder:
         return (MSG_DELETE, reminder)
+
+    reminder = try_parse_reminder(message)
+    if reminder:
+        return (MSG_REMINDER, reminder)
 
     if "help" in message.text.lower():
         return (MSG_HELP, None)

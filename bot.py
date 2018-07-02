@@ -99,10 +99,10 @@ def process_message_inner(config, message, conv):
     elif msg_type == parse.MSG_UNDO:
         if conv.context == conversation.CTX_SET:
             conv.get_reminder().delete()
-            conv.clear_weak_context()
-            return keybase.send(conv.id, OK)
         elif conv.context == conversation.CTX_DELETED:
-            return keybase.send(conv.id, "Sorry, I don't know how to undo that.")
+            conv.get_reminder().undelete()
+        conv.clear_weak_context()
+        return keybase.send(conv.id, OK)
 
     elif msg_type == parse.MSG_SOURCE:
         conv.clear_weak_context()
@@ -127,6 +127,13 @@ def process_message_inner(config, message, conv):
     elif msg_type == parse.MSG_NODEBUG:
         conv.set_debug(False)
         return keybase.send(conv.id, NODEBUG)
+
+    elif msg_type == parse.MSG_DELETE:
+        reminder = data
+        reminder.delete()
+        conv.set_context(conversation.CTX_DELETED, reminder)
+        msg = "Alright, I've deleted the reminder to " + reminder.body + " that was set for " + reminder.human_time() + "."
+        return keybase.send(conv.id, msg)
 
     elif msg_type == parse.MSG_SNOOZE:
         if conv.context != conversation.CTX_REMINDED:
@@ -254,6 +261,10 @@ class Config(object):
 def setup(config):
     keybase.setup(config)
     database.setup(config.db)
+    import nltk
+    libs = ('punkt', 'averaged_perceptron_tagger', 'universal_tagset')
+    for lib in libs:
+        nltk.download(lib, quiet=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Beep boop.')

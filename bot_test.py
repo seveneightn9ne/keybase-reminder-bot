@@ -36,12 +36,15 @@ class TestBot(unittest.TestCase):
         user = User.lookup(TEST_USER, DB)
         user.delete()
 
-    def message_test(self, incoming, outgoing, mockKeybaseSend):
+    def send_message(self, incoming, mockKeybaseSend):
         conv = Conversation.lookup(TEST_CONV_ID, TEST_CONV_JSON, DB)
         message = keybase.Message.inject(incoming, TEST_USER, TEST_CONV_ID, TEST_CHANNEL, DB)
         resp = bot.process_message(self.config, message, conv)
         if resp is not None:
             keybase.send(TEST_CONV_ID, resp)
+
+    def message_test(self, incoming, outgoing, mockKeybaseSend):
+        self.send_message(incoming, mockKeybaseSend)
         mockKeybaseSend.assert_called_with(TEST_CONV_ID, outgoing)
 
     def test_recent_message(self, mockNow, mockRandom, mockKeybaseSend):
@@ -91,14 +94,6 @@ class TestBot(unittest.TestCase):
     def test_set_reminder_day_time(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me to paint dan's fence at 10:30",
-                "paint dan's fence", "at 10:30 PM",
-                "on Sunday April 8 2018 at 10:30 PM",
-                datetime.timedelta(hours=2),
-                mockNow, mockKeybaseSend)
-
-    def test_set_reminder_day_time(self, mockNow, mockRandom, mockKeybaseSend):
-        self.reminder_test(
-                "remind me to paint dan's fence today at 10:30pm",
                 "paint dan's fence", "at 10:30 PM",
                 "on Sunday April 8 2018 at 10:30 PM",
                 datetime.timedelta(hours=2),
@@ -294,6 +289,25 @@ class TestBot(unittest.TestCase):
             "Ok! I'll remind you to foo on Wednesday at 9:17 PM", mockKeybaseSend)
         rows = bot.vacuum_old_reminders(self.config)
         assert rows == 1
+
+    def delete_test(self, delete_text, reminder_text, mockKeybaseSend):
+        self.send_message("remind me to do something else on Tuesday", mockKeybaseSend)
+        self.send_message(reminder_text, mockKeybaseSend)
+        self.send_message(delete_text, mockKeybaseSend)
+        assert mockKeybaseSend.call_args[0] != bot.UNKNOWN
+        list_output = "Here are your upcoming reminders:\n\n1. do something else - on Tuesday April 10 2018 at 12:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+        self.send_message("delete reminder #1", mockKeybaseSend)
+    
+    def test_delete(self, mockNow, mockRandom, mockKeybaseSend):
+        reminder = "remind me to foo tomorrow"
+
+        self.delete_test("delete the foo reminder", reminder, mockKeybaseSend)
+        self.delete_test("delete the reminder to foo", reminder, mockKeybaseSend)
+        self.delete_test("delete the reminder for 9:02pm tomorrow", reminder, mockKeybaseSend)
+        self.delete_test("delete reminder # 1", reminder, mockKeybaseSend)
+        self.delete_test("delete reminder 1", reminder, mockKeybaseSend)
+
 
 if __name__ == '__main__':
     unittest.main()
