@@ -92,6 +92,7 @@ def try_parse_when(when, user):
         # Returns a new when_str, Repetition
         if not "every" in when_str:
             return when_str, Repetition(None, None)
+        when_str = when_str.replace("week day", "weekday")
         days = set(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"])
         intervals_day = set(["day", "night", "evening", "morning", "afternoon"])
         intervals = set(INTERVALS)

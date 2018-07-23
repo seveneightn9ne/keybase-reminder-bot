@@ -449,5 +449,15 @@ class TestBot(unittest.TestCase):
         list_output = "Here are your upcoming reminders:\n\n1. pay the rent - every month on the 30th at 12:00 AM\n"
         self.message_test("list", list_output, mockKeybaseSend)
 
+    def test_repeating_week_day(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every week day at 8am to wake up",
+                "wake up", "every weekday at 8:00 AM",
+                "every weekday at 8:00 AM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. wake up - every weekday at 8:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
 if __name__ == '__main__':
     unittest.main()
