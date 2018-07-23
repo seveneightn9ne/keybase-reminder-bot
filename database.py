@@ -30,6 +30,10 @@ def initial_tables(c):
 def add_reminder_deleted(c):
     c.execute('alter table reminders add deleted boolean not null default 0')
 
+def add_reminder_repeating(c):
+    c.execute('alter table reminders add repetition_interval text')
+    c.execute('alter table reminders add repetition_nth int')
+
 def setup(db):
     try:
         c = sqlite3.connect(db)
@@ -44,6 +48,7 @@ def setup(db):
     migrations = [
             initial_tables,
             add_reminder_deleted,
+            add_reminder_repeating,
         ]
     for i, migration in enumerate(migrations, start=1):
         if db_version < i:

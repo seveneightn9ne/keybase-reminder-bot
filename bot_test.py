@@ -324,6 +324,130 @@ class TestBot(unittest.TestCase):
         list_output = "Here are your upcoming reminders:\n\n1. foo - on Monday April 9 2018 at 9:02 PM\n"
         self.message_test("list", list_output, mockKeybaseSend)
 
+    def test_repeating(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every tuesday 8am to eat a quiche",
+                "eat a quiche", "every week on Tuesday at 8:00 AM",
+                "every week on Tuesday at 8:00 AM",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every week on Tuesday at 8:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_preppy(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me on every tuesday at 8am to eat a quiche",
+                "eat a quiche", "every week on Tuesday at 8:00 AM",
+                "every week on Tuesday at 8:00 AM",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every week on Tuesday at 8:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_every_other(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me on every other tuesday to eat a quiche",
+                "eat a quiche", "every 2 weeks on Tuesday at 12:00 AM",
+                "every 2 weeks on Tuesday at 12:00 AM",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every 2 weeks on Tuesday at 12:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_every_other_with_time(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me on every other tuesday at 10am to eat a quiche",
+                "eat a quiche", "every 2 weeks on Tuesday at 10:00 AM",
+                "every 2 weeks on Tuesday at 10:00 AM",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every 2 weeks on Tuesday at 10:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_nth(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every 6 hours to eat a quiche",
+                "eat a quiche", "every 6 hours",
+                "every 6 hours",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every 6 hours\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_snooze(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every tuesday 8am to eat a quiche",
+                "eat a quiche", "every week on Tuesday at 8:00 AM",
+                "every week on Tuesday at 8:00 AM",
+                datetime.timedelta(days=2),
+                mockNow, mockKeybaseSend)
+        self.send_message("snooze for 20 minutes", mockKeybaseSend)
+
+        # snoozed message shows up
+        list_output = "Here are your upcoming reminders:\n\n" \
+            "1. eat a quiche - on Tuesday April 10 2018 at 9:22 PM\n" \
+            "2. eat a quiche - every week on Tuesday at 8:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+        # and the message was snoozed
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=21)
+        bot.send_reminders(self.config)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* eat a quiche")
+
+        # and the repetition still happens
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every week on Tuesday at 8:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_weekday(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every weekday at 6pm to eat a quiche",
+                "eat a quiche", "every weekday at 6:00 PM",
+                "every weekday at 6:00 PM",
+                datetime.timedelta(days=1),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. eat a quiche - every weekday at 6:00 PM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+        # 4 weekdays
+        for i in range(4):
+            mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
+            bot.send_reminders(self.config)
+            mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* eat a quiche")
+        
+        # saturday
+        mockKeybaseSend.reset_mock()
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
+        bot.send_reminders(self.config)
+        assert not mockKeybaseSend.called
+
+        # sunday
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
+        bot.send_reminders(self.config)
+        assert not mockKeybaseSend.called
+
+        # monday
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
+        bot.send_reminders(self.config)
+        mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* eat a quiche")
+
+    def test_repeating_year(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every year on january 1 to have a great year",
+                "have a great year", "every year on January 1 at 12:00 AM",
+                "every year on January 1 at 12:00 AM",
+                datetime.timedelta(days=365),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. have a great year - every year on January 1 at 12:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
+
+    def test_repeating_month(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me every month on the 30th at 12:00 AM to pay the rent",
+                "pay the rent", "every month on the 30th at 12:00 AM",
+                "every month on the 30th at 12:00 AM",
+                datetime.timedelta(days=30),
+                mockNow, mockKeybaseSend)
+        list_output = "Here are your upcoming reminders:\n\n1. pay the rent - every month on the 30th at 12:00 AM\n"
+        self.message_test("list", list_output, mockKeybaseSend)
 
 if __name__ == '__main__':
     unittest.main()

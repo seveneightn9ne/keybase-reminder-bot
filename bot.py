@@ -82,7 +82,7 @@ def process_message_inner(config, message, conv):
 
     elif msg_type == parse.MSG_WHEN:
         reminder = conv.get_reminder()
-        reminder.set_time(data)
+        reminder.set_time(data[0], data[1])
         confirmation = reminder.confirmation()
         conv.set_context(conversation.CTX_SET, reminder=reminder)
         return keybase.send(conv.id, confirmation)
@@ -223,6 +223,7 @@ def send_reminders(config):
         conv = Conversation.lookup(reminder.conv_id, None, config.db)
         keybase.send(conv.id, reminder.reminder_text())
         print "sent a reminder for", reminder.reminder_time
+        reminder.set_next_reminder() # if it repeats
         reminder.delete()
         conv.set_active()
         conv.set_context(conversation.CTX_REMINDED, reminder)

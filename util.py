@@ -25,3 +25,8 @@ def timezone_diff(old, new):
     new_time = old_time.astimezone(pytz.timezone(new))
     return (old_time.utcoffset() - new_time.utcoffset()).total_seconds()
 
+def date_suffix(d):
+    return 'th' if 11<=d<=13 else {1:'st',2:'nd',3:'rd'}.get(d%10, 'th')
+
+def strftime(format, t):
+    return t.strftime(format).replace('{S}', str(t.day) + date_suffix(t.day))

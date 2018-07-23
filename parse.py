@@ -3,7 +3,7 @@
 import dateparser, itertools, nltk, pytz, re
 
 import conversation, util
-from reminders import Reminder
+from reminders import Reminder, Repetition, INTERVALS
 from user import User
 from collections import namedtuple
 from datetime import datetime, timedelta # don't use anything that uses now.
@@ -88,10 +88,55 @@ def try_parse_when(when, user):
         # else... none of the fixes worked
         return when_str
 
+    def extract_repetition(when_str):
+        # Returns a new when_str, Repetition
+        if not "every" in when_str:
+            return when_str, Repetition(None, None)
+        days = set(["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"])
+        intervals_day = set(["day", "night", "evening", "morning", "afternoon"])
+        intervals = set(INTERVALS)
+        # 0: nth; 1: interval; 2: rest (e.g. "at 2pm")
+        regexes = [regex("(?:on )?every (?:(?P<nth>\w+) )?(?P<interval>" + i + ")s?(?:$|(?: (?P<rest>.+)))") for i in days | intervals_day | intervals]
+
+        for r in regexes:
+            match = r.search(when_str)
+            if match:
+                nth_text = match.group('nth')
+                interval = match.group('interval')
+                rest = match.group('rest')
+                if nth_text:
+                    nths = {"other": 2, "second": 2, "third": 3, "fourth": 4}
+                    if nth_text in nths:
+                        nth = nths[nth_text]
+                    else:
+                        nth_regex = regex("(\d+)[a-z]*")
+                        nth_match = nth_regex.search(nth_text)
+                        if nth_match:
+                            nth = int(match.group(1))
+                        else:
+                            # an nth that I don't understand.
+                            # TODO this is what posting to debug channel is for
+                            nth = 1
+                else:
+                    nth = 1
+                if interval in intervals_day:
+                    interval = "day"
+                if interval in days:
+                    if rest:
+                        rest = interval + " " + rest
+                    else:
+                        rest = "on " + interval
+                    interval = "week"
+                if not rest:
+                    rest = "in " + str(nth) + " " + interval + ("s" if nth > 1 else "")
+                return rest, Repetition(interval, nth)
+        return when_str, Repetition(None, None)
+    
     # include RELATIVE_BASE explicitly so we can mock now in tests
     local_timezone_str = user.timezone if user.timezone else 'US/Eastern'
     relative_base = util.now_local(local_timezone_str).replace(tzinfo=None)
     when = fixup_times(when, relative_base)
+    when, repetition = extract_repetition(when)
     parse_date_settings = {
             'PREFER_DATES_FROM': 'future',
             'PREFER_DAY_OF_MONTH': 'first',
@@ -101,8 +146,8 @@ def try_parse_when(when, user):
             'RELATIVE_BASE': relative_base}
     dt = dateparser.parse(when, settings=parse_date_settings)
     if dt != None and (dt - util.now_utc()).total_seconds() < 0:
-        return None
-    return dt
+        return None, None
+    return dt, repetition
 
 def regex(s):
     return re.compile(s, re.IGNORECASE)
@@ -120,18 +165,19 @@ def try_parse_reminder(message):
             if match:
                 reminder_text = match.group(1).strip()
                 when_text = match.group(2).strip()
-                when = try_parse_when(when_text, user) # may be None
-                possible_whens.append((len(when_text), reminder_text, when))
+                when, repetition = try_parse_when(when_text, user) # may be None
+                possible_whens.append((len(when_text), reminder_text, when, repetition))
 
         great_whens = filter(lambda w: w[2], possible_whens)
         if len(great_whens):
-            _, reminder_text, when = max(great_whens, key=lambda pair: pair[0])
+            _, reminder_text, when, repetition = max(great_whens, key=lambda pair: pair[0])
         elif len(possible_whens):
-            _, reminder_text, when = max(possible_whens, key=lambda pair: pair[0])
+            _, reminder_text, when, repetition = max(possible_whens, key=lambda pair: pair[0])
         else:
             reminder_text = text
+            repetition = None
             when = None
-        return reminder_text, when
+        return reminder_text, when, repetition
 
     # Order: "remind" <when> "to" <what>
     user = message.user()
@@ -140,20 +186,20 @@ def try_parse_reminder(message):
     match = reminder2.search(message.text)
     if match:
         reminder_text = match.group(2)
-        when = try_parse_when(match.group(1), user)
+        when, repetition = try_parse_when(match.group(1), user)
         if when:
-            return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
+            return Reminder(reminder_text, when, repetition, user.name, message.conv_id, message.db)
         else:
             reminder_without_when = reminder_text
 
     # Order: "remind" <what> "to" <when>
     match = regex("(?:remind me|reminder) to (.*)").search(message.text)
     if match:
-        reminder_text, when = split_reminder_when(match.group(1))
-        return Reminder(reminder_text, when, user.name, message.conv_id, message.db)
+        reminder_text, when, repetition = split_reminder_when(match.group(1))
+        return Reminder(reminder_text, when, repetition, user.name, message.conv_id, message.db)
 
     if reminder_without_when:
-        return Reminder(reminder_without_when, None, user.name, message.conv_id, message.db)
+        return Reminder(reminder_without_when, None, None, user.name, message.conv_id, message.db)
     return None
 
 def try_parse_timezone(text):
@@ -273,7 +319,7 @@ def try_parse_delete_by_when_or_what(text, reminders, user):
         if match:
             match_text = match.group(1)
             text_matches.append(match_text)
-            when = try_parse_when(match_text, user)
+            when, _ = try_parse_when(match_text, user)
             if when:
                 when_matches.append(when)
     
@@ -285,8 +331,6 @@ def try_parse_delete_by_when_or_what(text, reminders, user):
     reminder_x_text = itertools.product(reminders, text_matches)
 
     for (reminder, when) in reminder_x_when:
-        print reminder.reminder_time
-        print when
         if abs(reminder.reminder_time - when) < timedelta(minutes=1):
             reminder_matches.append((reminder, 10))
         elif reminder.reminder_time == when + timedelta(days=1):
@@ -344,7 +388,7 @@ def try_parse_snooze(text, user, config):
         phrase = match.group(1)
     else:
         phrase = "10 minutes"
-    t = try_parse_when("in " + phrase, user)
+    t, _ = try_parse_when("in " + phrase, user)
     if t:
         return SnoozeData(phrase, t)
 
@@ -362,9 +406,9 @@ def parse_message(message, conv, config):
         return (MSG_HELP, None)
 
     if conv.context == conversation.CTX_WHEN:
-        when = try_parse_when(message.text, message.user())
+        when, repetition = try_parse_when(message.text, message.user())
         if when is not None:
-            return (MSG_WHEN, when)
+            return (MSG_WHEN, (when, repetition))
 
     tz, attempted = try_parse_timezone(message.text)
     if tz is not None:
