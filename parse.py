@@ -106,6 +106,7 @@ def try_parse_when(when, user):
                 interval = match.group('interval')
                 rest = match.group('rest')
                 if nth_text:
+                    nth_text = nth_text.lower()
                     nths = {"other": 2, "second": 2, "third": 3, "fourth": 4}
                     if nth_text in nths:
                         nth = nths[nth_text]
@@ -120,6 +121,8 @@ def try_parse_when(when, user):
                             nth = 1
                 else:
                     nth = 1
+                if interval:
+                    interval = interval.lower()
                 if interval in intervals_day:
                     interval = "day"
                 if interval in days:
@@ -129,6 +132,7 @@ def try_parse_when(when, user):
                         rest = "on " + interval
                     interval = "week"
                 if not rest:
+                    # TODO "weekday" doesn't work well here.
                     rest = "in " + str(nth) + " " + interval + ("s" if nth > 1 else "")
                 return rest, Repetition(interval, nth)
         return when_str, Repetition(None, None)

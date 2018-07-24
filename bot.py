@@ -220,13 +220,17 @@ def process_new_messages(config):
 
 def send_reminders(config):
     for reminder in reminders.get_due_reminders(config.db):
-        conv = Conversation.lookup(reminder.conv_id, None, config.db)
-        keybase.send(conv.id, reminder.reminder_text())
-        print "sent a reminder for", reminder.reminder_time
-        reminder.set_next_reminder() # if it repeats
-        reminder.delete()
-        conv.set_active()
-        conv.set_context(conversation.CTX_REMINDED, reminder)
+        try:
+            conv = Conversation.lookup(reminder.conv_id, None, config.db)
+            keybase.send(conv.id, reminder.reminder_text())
+            print "sent a reminder for", reminder.reminder_time
+            reminder.set_next_reminder() # if it repeats
+            reminder.delete()
+            conv.set_active()
+            conv.set_context(conversation.CTX_REMINDED, reminder)
+        except Exception as e:
+            keybase.debug("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+            raise e
 
 def vacuum_old_reminders(config):
     with sqlite3.connect(config.db) as c:
