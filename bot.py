@@ -168,7 +168,9 @@ def process_message(config, message, conv):
     return unknown_msg
 
 def process_new_messages(config):
-    results = keybase.call("list")
+    params = {"options": {
+        "unread_only": True}}
+    results = keybase.call("list", params)
     all_convs = results["conversations"]
 
     if not all_convs:
