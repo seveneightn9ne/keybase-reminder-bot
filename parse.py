@@ -187,7 +187,7 @@ def try_parse_reminder(message):
     # Order: "remind" <when> "to" <what>
     user = message.user()
     reminder_without_when = None
-    reminder2 = regex("(?:remind me|reminder) (.*?) to (.*)")
+    reminder2 = regex("(?:remind me|remind us|reminder) (.*?) to (.*)")
     match = reminder2.search(message.text)
     if match:
         reminder_text = match.group(2)
@@ -198,7 +198,7 @@ def try_parse_reminder(message):
             reminder_without_when = reminder_text
 
     # Order: "remind" <what> "to" <when>
-    match = regex("(?:remind me|reminder) to (.*)").search(message.text)
+    match = regex("(?:remind me|remind us|reminder) to (.*)").search(message.text)
     if match:
         reminder_text, when, repetition = split_reminder_when(match.group(1))
         return Reminder(reminder_text, when, repetition, user.name, message.conv_id, message.db)
