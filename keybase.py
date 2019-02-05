@@ -102,6 +102,13 @@ def setup(config):
         print >> sys.stderr, "Run `keybase logout` to log them out."
         sys.exit(1)
 
+
+    # Disable typing notifications
+    try:
+        subprocess.check_call(['keybase', 'chat', 'notification-settings', '--disable-typing'])
+    except subprocess.CalledProcessError as e:
+        print >> sys.stderr, "Error during disabling typing notifications", e.message
+
     if config.debug_team and config.debug_topic:
         try:
             call("read", {"options": {"channel": {
