@@ -68,7 +68,15 @@ def call(method, params=None):
     return j["result"]
 
 def send(conv_id, text):
-    call("send", {"options": {"conversation_id": conv_id, "message": {"body": text}}})
+    inbox = call("list")
+    channel = None
+    for conv in inbox["conversations"]:
+        if conv["id"] == conv_id:
+            channel = conv["channel"]
+            break
+    if channel == None:
+        raise Exception("Could not find conv for id: " + conv_id)
+    call("send", {"options": {"channel": channel, "message": {"body": text}}})
     return True, None
 
 def debug(message, config):
