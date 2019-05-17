@@ -210,7 +210,7 @@ def process_new_messages(config):
             except Exception as e:
                 keybase.send(id,
                         "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
-                keybase.debug("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+                keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
                 if conv.debug:
                     text = message["msg"]["content"]["text"]["body"]
                     from_u = message["msg"]["sender"]["username"]
@@ -231,7 +231,7 @@ def send_reminders(config):
             conv.set_active()
             conv.set_context(conversation.CTX_REMINDED, reminder)
         except Exception as e:
-            keybase.debug("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+            keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
             raise e
 
 def vacuum_old_reminders(config):
@@ -249,12 +249,13 @@ def vacuum_old_reminders(config):
     return rows
 
 class Config(object):
-    def __init__(self, db, username, owner, debug_team=None, debug_topic=None):
+    def __init__(self, db, username, owner, debug_team=None, debug_topic=None, autosend_logs=True):
         self.db = db
         self.username = username
         self.owner = owner
         self.debug_team = debug_team
         self.debug_topic = debug_topic
+        self.autosend_logs = autosend_logs
 
     @classmethod
     def fromFile(cls, configFile):
@@ -265,7 +266,8 @@ class Config(object):
         owner = config['keybase']['owner']
         debug_team = config['keybase'].get('debug_team', None)
         debug_topic = config['keybase'].get('debug_topic', None)
-        return Config(db, username, owner, debug_team, debug_topic)
+        autosend_logs = config['keybase'].get('autosend_logs', True)
+        return Config(db, username, owner, debug_team, debug_topic, autosend_logs)
 
 def setup(config):
     keybase.setup(config)
