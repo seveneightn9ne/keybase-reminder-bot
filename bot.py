@@ -266,7 +266,7 @@ class Config(object):
         owner = config['keybase']['owner']
         debug_team = config['keybase'].get('debug_team', None)
         debug_topic = config['keybase'].get('debug_topic', None)
-        autosend_logs = config['keybase'].get('autosend_logs', False)
+        autosend_logs = config['keybase'].getboolean('autosend_logs', False)
         return Config(db, username, owner, debug_team, debug_topic, autosend_logs)
 
 def setup(config):
