@@ -186,7 +186,7 @@ def process_new_messages(config):
             # Don't do anything in the debug team
             continue
         params = {"options": {
-                "channel": conv_json["channel"],
+                "conversation_id": id,
                 "unread_only": True}}
         response = keybase.call("read", params)
         #print "other response", response
