@@ -302,9 +302,13 @@ if __name__ == "__main__":
     def signal_handler(signal, frame):
         global running
         running = False
+        keybase.clear_command_advertisements()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+
+    keybase.advertise_commands()
 
     while running:
         sys.stdout.flush()
