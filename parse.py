@@ -263,6 +263,7 @@ def try_parse_source(text):
         "wheres the source",
         "how do you work",
         "what are you written in",
+        "source",
     ]
     if s in forms:
         return True
@@ -327,7 +328,7 @@ def try_parse_delete_by_when_or_what(text, reminders, user):
             when, _ = try_parse_when(match_text, user)
             if when:
                 when_matches.append(when)
-    
+
     if len(text_matches) == len(when_matches) == 0:
         return None
 
@@ -398,6 +399,10 @@ def try_parse_snooze(text, user, config):
         return SnoozeData(phrase, t)
 
 def parse_message(message, conv, config):
+
+    # convert an advertisement command to a regular message
+    if message.text.startswith("!"):
+        message.text = message.text[1:]
 
     reminder = try_parse_delete(message, conv.get_all_reminders())
     if reminder:
