@@ -60,7 +60,11 @@ def call(method, params=None):
     proc.stdin.write(json.dumps(query) + "\n")
     proc.stdin.close()
     response = proc.stdout.readline()
-    j = json.loads(response)
+    try:
+        j = json.loads(response)
+    except Exception as e:
+        print "Unable to parse json from:", response
+
     if "error" in j:
         print "Problem with query:", query
         raise Exception(j["error"]["message"])
