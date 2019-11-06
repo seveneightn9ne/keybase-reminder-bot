@@ -1,6 +1,6 @@
 # Utilities for interacting with the keybase chat api
 
-import json, subprocess, sys
+import json, subprocess, sys, time
 from subprocess import PIPE
 from user import User
 
@@ -48,7 +48,7 @@ class Message(object):
     def is_private_channel(self):
         return self.channel_json["name"].count(',') == 1
 
-def call(method, params=None):
+def call(method, params=None, retries=0):
     # method: string, params: dict
     # return: dict
     #print "keybase call " + method
@@ -63,8 +63,12 @@ def call(method, params=None):
     try:
         j = json.loads(response)
     except Exception as e:
-        print "Unable to parse json from:", response
-        return {}
+        if retries < 3:
+            print "Unable to parse json from:", response
+            time.sleep(1)
+            return call(method, params, retries+1)
+        else:
+            raise e
 
     if "error" in j:
         print "Problem with query:", query
