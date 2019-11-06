@@ -64,6 +64,7 @@ def call(method, params=None):
         j = json.loads(response)
     except Exception as e:
         print "Unable to parse json from:", response
+        return {}
 
     if "error" in j:
         print "Problem with query:", query
