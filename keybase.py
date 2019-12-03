@@ -154,7 +154,7 @@ def advertise_commands():
     !timezone GMT
     !timezone US/Pacific```"""
     call("advertisecommands", {"options": {
-        "alias": "reminderbot",
+        "alias": "Reminder Bot",
         "advertisements": [{
             "type": "public",
             "commands": [
