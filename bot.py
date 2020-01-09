@@ -179,6 +179,8 @@ def process_new_messages(config):
     unread_convs = filter(lambda conv: conv["unread"], all_convs)
     # print str(len(unread_convs)) + " unread conversations"
 
+    exc = None
+
     for conv_json in unread_convs:
         id = conv_json["id"]
         conv = Conversation.lookup(id, conv_json, config.db)
@@ -216,11 +218,15 @@ def process_new_messages(config):
                     from_u = message["msg"]["sender"]["username"]
                     keybase.debug("The message, sent by @" + from_u + " was: " + text, config)
                 conv.set_context(conversation.CTX_NONE)
-                raise e
+                exc = e
+                continue
         if not sent_resp and resp_to_send is not None:
             keybase.send(conv.id, resp_to_send)
+    if exc != None:
+        raise exc
 
 def send_reminders(config):
+    exc = None
     for reminder in reminders.get_due_reminders(config.db):
         try:
             conv = Conversation.lookup(reminder.conv_id, None, config.db)
@@ -232,7 +238,9 @@ def send_reminders(config):
             conv.set_context(conversation.CTX_REMINDED, reminder)
         except Exception as e:
             keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
-            raise e
+            exc = e
+    if exc != None:
+        raise exc
 
 def vacuum_old_reminders(config):
     with sqlite3.connect(config.db) as c:
