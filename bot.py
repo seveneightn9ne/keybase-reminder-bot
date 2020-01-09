@@ -238,6 +238,7 @@ def send_reminders(config):
             conv.set_context(conversation.CTX_REMINDED, reminder)
         except Exception as e:
             keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+            print "Crash sending reminder to", conv.id
             exc = e
     if exc != None:
         raise exc
