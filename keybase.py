@@ -18,18 +18,27 @@ class Message(object):
                 u'members_type': u'impteamnative',
                 u'topic_type': u'chat',
                 u'name': u'jessk,reminderbot',
-                u'public': False},
+                u'public': False
+            },
+            u'bot_info': {
+                u'bot_uid': 'f1f49e2da3db6392b47dc913b4e85519',
+                u'bot_username': 'reminderbot'
+            },
             u'sender': {
                 u'username': u'jessk',
                 u'device_name': u'phone',
                 u'uid': u'653ba091fa61606e5a3c8fb2086b3419',
-                u'device_id': u'c4aec52a455b551af3b042c46537fc18'}}}]}
+                u'device_id': u'c4aec52a455b551af3b042c46537fc18'
+            }
+        }
+    }
         '''
     def __init__(self, conv_id, json, db):
         self.text = json["msg"]["content"]["text"]["body"]
         self.author = json["msg"]["sender"]["username"]
         self.conv_id = conv_id
         self.channel_json = json["msg"]["channel"]
+        self.bot_username = json["msg"].get("bot_info", {}).get("bot_username")
         self.json = json
         self.db = db
 
@@ -46,7 +55,10 @@ class Message(object):
         return User.lookup(self.author, self.db)
 
     def is_private_channel(self):
-        return self.channel_json["name"].count(',') == 1
+        return self.channel_json["members_type"] != "team" \
+                # `jessk,reminderbot` or `jessk` with reminderbot as a bot or
+                # restricted bot member
+                and self.channel_json["name"].count(',') <= 1
 
 def call(method, params=None, retries=0):
     # method: string, params: dict

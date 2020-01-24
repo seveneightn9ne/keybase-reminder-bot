@@ -41,6 +41,7 @@ NODEBUG = "Ok! Debug mode is off now."
 # Returns True iff I interacted with the user.
 def process_message_inner(config, message, conv):
     if not message.is_private_channel() \
+            and message.bot_username != config.username \
             and not config.username in message.text \
             and not conv.is_strong_context():
         print "Ignoring message not for me"
