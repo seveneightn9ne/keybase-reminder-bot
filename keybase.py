@@ -55,10 +55,9 @@ class Message(object):
         return User.lookup(self.author, self.db)
 
     def is_private_channel(self):
-        return self.channel_json["members_type"] != "team" \
-                # `jessk,reminderbot` or `jessk` with reminderbot as a bot or
-                # restricted bot member
-                and self.channel_json["name"].count(',') <= 1
+        # `jessk,reminderbot` or `jessk` with reminderbot as a bot or
+        # restricted bot member
+        return self.channel_json["members_type"] != "team" and self.channel_json["name"].count(',') <= 1
 
 def call(method, params=None, retries=0):
     # method: string, params: dict
