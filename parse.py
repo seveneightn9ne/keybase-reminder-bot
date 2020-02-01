@@ -28,8 +28,8 @@ MSG_DELETE     = "DELETE"
 
 def try_parse_when(when, user):
     def fixup_times(when_str, relative_base):
-        # When there is no explicit AM/PM assume the next upcoming one
-        # H:MM (AM|PM)?
+        # When there is no explicit AM/PM.
+        # Assume the next upcoming one H:MM (AM|PM)?
 
         def hhmm_explicit_ampm(when_str, relative_base):
             # looks for HH:MM without an AM or PM and adds 12 to the HH if necessary.
@@ -44,9 +44,13 @@ def try_parse_when(when, user):
                 # AM/PM is explicit
                 return when_str
 
-            time = datetime.strptime(time_match, '%I:%M')
+            try:
+                time = datetime.strptime(time_match, '%H:%M')
+            except ValueError:
+                return None
 
-            if time.hour > 12:
+            definitely_using_24 = time_match[0] == "0" or time.hour > 12
+            if definitely_using_24:
                 return when_str # you explicitly are after noon e.g. 23:00
 
             if relative_base.hour > time.hour:
@@ -68,9 +72,13 @@ def try_parse_when(when, user):
                 # AM/PM is explicit
                 return when_with_minutes
 
-            time = datetime.strptime(hour_match, '%I')
+            try:
+                time = datetime.strptime(hour_match, '%H')
+            except ValueError:
+                return None
 
-            if time.hour > 12:
+            definitely_using_24 = hour_match[0] == "0" or time.hour > 12
+            if definitely_using_24:
                 return when_with_minutes # you explicitly are after noon e.g. 23:00
 
             if relative_base.hour > time.hour:

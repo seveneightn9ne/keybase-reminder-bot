@@ -99,6 +99,55 @@ class TestBot(unittest.TestCase):
                 datetime.timedelta(hours=2),
                 mockNow, mockKeybaseSend)
 
+    @unittest.skip("jess disagrees")
+    def test_set_reminder_rollover(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to paint dan's fence at 8:30",
+                "paint dan's fence", "at 8:30 AM",
+                "on Monday April 9 2018 at 8:30 AM",
+                datetime.timedelta(hours=12),
+                mockNow, mockKeybaseSend)
+
+    def test_set_reminder_24_time(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to paint dan's fence at 22:30",
+                "paint dan's fence", "at 10:30 PM",
+                "on Sunday April 8 2018 at 10:30 PM",
+                datetime.timedelta(hours=2),
+                mockNow, mockKeybaseSend)
+
+    def test_set_reminder_24_time_2(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to paint dan's fence at 08:30",
+                "paint dan's fence", "at 8:30 AM",
+                "on Monday April 9 2018 at 8:30 AM",
+                datetime.timedelta(hours=12),
+                mockNow, mockKeybaseSend)
+
+    def test_set_reminder_24_time_3(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to paint dan's fence at 22",
+                "paint dan's fence", "at 10:00 PM",
+                "on Sunday April 8 2018 at 10:00 PM",
+                datetime.timedelta(hours=2),
+                mockNow, mockKeybaseSend)
+
+    def test_set_reminder_24_time_4(self, mockNow, mockRandom, mockKeybaseSend):
+        self.reminder_test(
+                "remind me to paint dan's fence at 08",
+                "paint dan's fence", "at 8:00 AM",
+                "on Monday April 9 2018 at 8:00 AM",
+                datetime.timedelta(hours=12),
+                mockNow, mockKeybaseSend)
+
+    def test_set_reminder_24_time_5(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test("remind me to paint dan's fence at 24:30",
+            "When do you want to be reminded?", mockKeybaseSend)
+
+    def test_set_reminder_24_time_6(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test("remind me to paint dan's fence at 14:00 am",
+            "When do you want to be reminded?", mockKeybaseSend)
+
     def test_set_reminder_pre_when(self, mockNow, mockRandom, mockKeybaseSend):
         self.reminder_test(
                 "remind me tuesday 8am to eat a quiche",
