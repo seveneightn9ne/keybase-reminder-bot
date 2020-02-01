@@ -1,1 +1,14 @@
 # keybase-reminder-bot
+
+Need help remembering things? Then add this bot to your conversations and get convenient reminders right within Keybase chat. Simply speak to the bot in plain English, and it will setup reminders to let you know when your important events are happening.
+
+Reminder Bot is hosted for anyone to use as [reminderbot](keybase.io/reminderbot).
+
+Reminder Bot uses python 2, not 3.
+
+# Running tests
+
+```
+pip install -r requirements.txt
+python bot_test.py
+```
