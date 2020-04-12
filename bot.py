@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 import argparse, configparser, os, pytz, signal, sqlite3, subprocess, sys, time, traceback
-
 import conversation, database, keybase, parse, reminders, util
 from conversation import Conversation
 
@@ -341,6 +340,3 @@ if __name__ == "__main__":
         time.sleep(1)
 
     print("ReminderBot shut down gracefully.")
-
-
-
