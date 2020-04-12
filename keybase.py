@@ -75,14 +75,14 @@ def call(method, params=None, retries=0):
         j = json.loads(response)
     except Exception as e:
         if retries < 3:
-            print "Unable to parse json from:", response
+            print("Unable to parse json from:", response)
             time.sleep(1)
             return call(method, params, retries+1)
         else:
             raise e
 
     if "error" in j:
-        print "Problem with query:", query
+        print("Problem with query:", query)
         raise Exception(j["error"]["message"])
 
     return j["result"]
@@ -98,7 +98,7 @@ def debug_crash(message, config):
             subprocess.check_call(['keybase', 'log', 'send',
                 '--feedback', 'reminderbot crash', '--no-confirm'])
         except subprocess.CalledProcessError:
-            print >> sys.stderr, "Error during call to `keybase log send`"
+            print("Error during call to `keybase log send`", file=sys.stderr)
 
 def debug(message, config):
     if config.debug_team and config.debug_topic:
@@ -108,7 +108,7 @@ def debug(message, config):
             "topic_name": config.debug_topic},
             "message": {"body": message}}})
     else:
-        print >> sys.stderr, "[DEBUG]", message
+        print("[DEBUG]", message, file=sys.stderr)
 
 def _status():
     proc = subprocess.Popen(['keybase','status', '-j'], stdout=PIPE)
@@ -122,13 +122,13 @@ def setup(config):
         try:
             subprocess.check_call(['keybase', 'login', config.username])
         except subprocess.CalledProcessError:
-            print >> sys.stderr, "FATAL: Error during call to `keybase login " \
-                    + config.username + "`"
+            print("FATAL: Error during call to `keybase login " \
+                    + config.username + "`", file=sys.stderr)
             sys.exit(1)
     elif not logged_in == config.username:
-        print >> sys.stderr, "FATAL: Logged in to Keybase as wrong user."
-        print >> sys.stderr, "Logged in as "+logged_in+" but expected "+config.username+". "
-        print >> sys.stderr, "Run `keybase logout` to log them out."
+        print("FATAL: Logged in to Keybase as wrong user.", file=sys.stderr)
+        print("Logged in as "+logged_in+" but expected "+config.username+". ", file=sys.stderr)
+        print("Run `keybase logout` to log them out.", file=sys.stderr)
         sys.exit(1)
 
 
@@ -136,7 +136,7 @@ def setup(config):
     try:
         subprocess.check_call(['keybase', 'chat', 'notification-settings', '--disable-typing'])
     except subprocess.CalledProcessError as e:
-        print >> sys.stderr, "Error during disabling typing notifications", e.message
+        print("Error during disabling typing notifications", e.message, file=sys.stderr)
 
     if config.debug_team and config.debug_topic:
         try:
@@ -145,8 +145,8 @@ def setup(config):
                 "members_type": "team",
                 "topic_name": config.debug_topic}}})
         except Exception as e:
-            print >> sys.stderr, "Can't read from the debug channel:"
-            print >> sys.stderr, e.message
+            print("Can't read from the debug channel:", file=sys.stderr)
+            print(e.message, file=sys.stderr)
             sys.exit(1)
 
 
