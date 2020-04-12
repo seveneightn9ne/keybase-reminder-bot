@@ -44,13 +44,13 @@ def process_message_inner(config, message, conv):
             and message.bot_username != config.username \
             and not config.username in message.text \
             and not conv.is_strong_context():
-        print "Ignoring message not for me"
+        print("Ignoring message not for me")
         return False, None
 
     # TODO need some sort of onboarding for first-time user
 
     msg_type, data = parse.parse_message(message, conv, config)
-    print "Received message parsed as " + str(msg_type) + " in context " + str(conv.context)
+    print("Received message parsed as " + str(msg_type) + " in context " + str(conv.context))
     if msg_type == parse.MSG_REMINDER and message.user().timezone is None:
         keybase.send(conv.id, ASSUME_TZ)
         message.user().set_timezone("US/Eastern")
@@ -159,7 +159,7 @@ def process_message_inner(config, message, conv):
             return True, PROMPT_HELP
 
     # Shouldn't be able to get here
-    print msg_type, data
+    print(msg_type, data)
     assert False, "unexpected parsed msg_type"
 
 def process_message(config, message, conv):
@@ -177,7 +177,7 @@ def process_new_messages(config):
     if not all_convs:
         return
 
-    unread_convs = filter(lambda conv: conv["unread"], all_convs)
+    unread_convs = [conv for conv in all_convs if conv["unread"]]
     # print str(len(unread_convs)) + " unread conversations"
 
     exc = None
@@ -197,12 +197,12 @@ def process_new_messages(config):
         resp_to_send = None
         for message in reversed(response["messages"]):
             if "error" in message:
-                print "message error: {}".format(message["error"])
+                print("message error: {}".format(message["error"]))
                 continue
             # TODO consider processing all messages together
             if not "text" in message["msg"]["content"]:
                 # Ignore messages like edits and people joining the channel
-                print "ignoring message of type: {}".format(message["msg"]["content"]["type"])
+                print("ignoring message of type: {}".format(message["msg"]["content"]["type"]))
                 continue
             try:
                 resp = process_message(config, keybase.Message(id, message, config.db), conv)
@@ -232,14 +232,14 @@ def send_reminders(config):
         try:
             conv = Conversation.lookup(reminder.conv_id, None, config.db)
             keybase.send(conv.id, reminder.reminder_text())
-            print "sent a reminder for", reminder.reminder_time
+            print("sent a reminder for", reminder.reminder_time)
             reminder.set_next_reminder() # if it repeats
             reminder.delete()
             conv.set_active()
             conv.set_context(conversation.CTX_REMINDED, reminder)
         except Exception as e:
             keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
-            print "Crash sending reminder to", conv.id
+            print("Crash sending reminder to", conv.id)
             exc = e
     if exc != None:
         raise exc
@@ -255,7 +255,7 @@ def vacuum_old_reminders(config):
         )''')
         rows = cur.rowcount
         if rows > 0:
-            print "deleted", rows, "old reminders"
+            print("deleted", rows, "old reminders")
     return rows
 
 class Config(object):
@@ -305,8 +305,8 @@ if __name__ == "__main__":
 
     setup(config)
 
-    print "ReminderBot is running..."
-    print "username: " + config.username
+    print("ReminderBot is running...")
+    print("username: " + config.username)
 
     running = True
     def signal_handler(signal, frame):
@@ -333,14 +333,14 @@ if __name__ == "__main__":
             except:
                 exc_type, value, tb = sys.exc_info()
                 traceback.print_tb(tb)
-                print >> sys.stderr, str(exc_type) + ": " + str(value)
+                print(str(exc_type) + ": " + str(value), file=sys.stderr)
 
             if not running:
                 break
 
         time.sleep(1)
 
-    print "ReminderBot shut down gracefully."
+    print("ReminderBot shut down gracefully.")
 
 
 

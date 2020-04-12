@@ -181,7 +181,7 @@ def try_parse_reminder(message):
                 when, repetition = try_parse_when(when_text, user) # may be None
                 possible_whens.append((len(when_text), reminder_text, when, repetition))
 
-        great_whens = filter(lambda w: w[2], possible_whens)
+        great_whens = [w for w in possible_whens if w[2]]
         if len(great_whens):
             _, reminder_text, when, repetition = max(great_whens, key=lambda pair: pair[0])
         elif len(possible_whens):
@@ -226,9 +226,9 @@ def try_parse_timezone(text):
             rest = match.group(1)
             words = rest.split(" ")
             for word in words:
-                if any(map(lambda e: e.match(word), et)):
+                if any([e.match(word) for e in et]):
                     return "US/Eastern", True
-                if any(map(lambda p: p.match(word), pt)):
+                if any([p.match(word) for p in pt]):
                     return "US/Pacific", True
                 try:
                     pytz.timezone(word)
@@ -360,7 +360,7 @@ def try_parse_delete_by_when_or_what(text, reminders, user):
     if len(reminder_matches) == 0:
         return None
 
-    return max(reminder_matches, key=lambda (w,s): s)[0]
+    return max(reminder_matches, key=lambda w_s: w_s[1])[0]
 
 def try_parse_delete_by_idx(text, reminders):
     for r in delete_idx_patterns:

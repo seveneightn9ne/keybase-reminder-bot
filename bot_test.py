@@ -49,9 +49,9 @@ class TestBot(unittest.TestCase):
 
     def test_recent_message(self, mockNow, mockRandom, mockKeybaseSend):
         # When bot receives two messages in a row, it shouldn't send the full help message twice.
-        self.message_test(u'not parsable', bot.PROMPT_HELP, mockKeybaseSend)
+        self.message_test('not parsable', bot.PROMPT_HELP, mockKeybaseSend)
         mockNow.return_value = mockNow.return_value + datetime.timedelta(minutes=1)
-        self.message_test(u'not parsable', bot.UNKNOWN, mockKeybaseSend)
+        self.message_test('not parsable', bot.UNKNOWN, mockKeybaseSend)
 
     def reminder_test(self, text, reminder, whentext, fullwhen, timedelta, mockNow, mockKeybaseSend):
         self.message_test(text,
