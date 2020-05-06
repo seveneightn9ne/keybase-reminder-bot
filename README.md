@@ -5,11 +5,9 @@ Need help remembering things? Then add this bot to your conversations and get co
 Reminder Bot is hosted for anyone to use as
 [reminderbot](https://keybase.io/reminderbot).
 
-Reminder Bot uses python 2, not 3.
-
 # Running tests
 
 ```
-pip install -r requirements.txt
-python bot_test.py
+pip3 install -r requirements.txt
+python3 bot_test.py
 ```
