@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import argparse, configparser, os, pytz, signal, sqlite3, subprocess, sys, time, traceback
 import conversation, database, keybase, parse, reminders, util
@@ -212,7 +212,7 @@ def process_new_messages(config):
             except Exception as e:
                 keybase.send(id,
                         "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
-                keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+                keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(), config)
                 if conv.debug:
                     text = message["msg"]["content"]["text"]["body"]
                     from_u = message["msg"]["sender"]["username"]
@@ -237,7 +237,7 @@ def send_reminders(config):
             conv.set_active()
             conv.set_context(conversation.CTX_REMINDED, reminder)
         except Exception as e:
-            keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(e), config)
+            keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(), config)
             print("Crash sending reminder to", conv.id)
             exc = e
     if exc != None:

@@ -68,11 +68,11 @@ def call(method, params=None, retries=0):
         params = {}
     query = {"method": method, "params": params}
     proc = subprocess.Popen(['keybase','chat','api'], stdin=PIPE, stdout=PIPE)
-    proc.stdin.write(json.dumps(query) + "\n")
+    proc.stdin.write((json.dumps(query) + "\n").encode('utf-8'))
     proc.stdin.close()
     response = proc.stdout.readline()
     try:
-        j = json.loads(response)
+        j = json.loads(response.decode('utf-8'))
     except Exception as e:
         if retries < 3:
             print("Unable to parse json from:", response)
@@ -113,7 +113,7 @@ def debug(message, config):
 def _status():
     proc = subprocess.Popen(['keybase','status', '-j'], stdout=PIPE)
     out, err = proc.communicate()
-    return json.loads(out)
+    return json.loads(out.decode('utf-8'))
 
 def setup(config):
     status = _status()
