@@ -244,8 +244,11 @@ def send_reminders(config):
                 conv.set_active()
                 conv.set_context(conversation.CTX_REMINDED, reminder)
             except Exception as e:
-                sentry_sdk.capture_exception()
                 reminder.increment_error()
+                if e.message == "no conversations matched \"{}\"".format(reminder.conv_id):
+                    # reminderbot has been removed from the channel. Known error, no need to report
+                    continue
+                sentry_sdk.capture_exception()
 
 def vacuum_old_reminders(config):
     with sqlite3.connect(config.db) as c:
