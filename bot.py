@@ -197,6 +197,8 @@ def process_new_messages(config):
                 resp_to_send = None
                 for message in reversed(response["messages"]):
                     if "error" in message:
+                        if message["error"] == "Unable to decrypt chat message: message not available":
+                            continue
                         sentry_sdk.capture_exception(Exception("Reading message: {}".format(message["error"])))
                         continue
                     # TODO consider processing all messages together
