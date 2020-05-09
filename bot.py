@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import argparse, configparser, os, pytz, signal, sqlite3, subprocess, sys, time, traceback
+import argparse, configparser, os, pytz, sentry_sdk, signal, sqlite3, subprocess, sys, time, traceback
 import conversation, database, keybase, parse, reminders, util
 from conversation import Conversation
 
@@ -179,69 +179,71 @@ def process_new_messages(config):
     unread_convs = [conv for conv in all_convs if conv["unread"]]
     # print str(len(unread_convs)) + " unread conversations"
 
-    exc = None
-
     for conv_json in unread_convs:
-        id = conv_json["id"]
-        conv = Conversation.lookup(id, conv_json, config.db)
-        if conv.channel == config.debug_team:
-            # Don't do anything in the debug team
-            continue
-        params = {"options": {
-                "conversation_id": id,
-                "unread_only": True}}
-        response = keybase.call("read", params)
-        #print "other response", response
-        sent_resp = False
-        resp_to_send = None
-        for message in reversed(response["messages"]):
-            if "error" in message:
-                print("message error: {}".format(message["error"]))
-                continue
-            # TODO consider processing all messages together
-            if not "text" in message["msg"]["content"]:
-                # Ignore messages like edits and people joining the channel
-                print("ignoring message of type: {}".format(message["msg"]["content"]["type"]))
-                continue
+        with sentry_sdk.push_scope() as scope:
             try:
-                resp = process_message(config, keybase.Message(id, message, config.db), conv)
-                if resp is None:
-                    sent_resp = True
-                elif resp_to_send is None:
-                    resp_to_send = resp
-            except Exception as e:
-                keybase.send(id,
-                        "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
-                keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(), config)
-                if conv.debug:
-                    text = message["msg"]["content"]["text"]["body"]
-                    from_u = message["msg"]["sender"]["username"]
-                    keybase.debug("The message, sent by @" + from_u + " was: " + text, config)
-                conv.set_context(conversation.CTX_NONE)
-                exc = e
-                continue
-        if not sent_resp and resp_to_send is not None:
-            keybase.send(conv.id, resp_to_send)
-    if exc != None:
-        raise exc
+                id = conv_json["id"]
+                scope.set_tag("conv_id", id)
+                conv = Conversation.lookup(id, conv_json, config.db)
+                if conv.channel == config.debug_team:
+                    # Don't do anything in the debug team
+                    continue
+                params = {"options": {
+                        "conversation_id": id,
+                        "unread_only": True}}
+                response = keybase.call("read", params)
+                #print "other response", response
+                sent_resp = False
+                resp_to_send = None
+                for message in reversed(response["messages"]):
+                    if "error" in message:
+                        sentry_sdk.capture_exception(Exception("Reading message: {}".format(message["error"])))
+                        continue
+                    # TODO consider processing all messages together
+                    if not "text" in message["msg"]["content"]:
+                        # Ignore messages like edits and people joining the channel
+                        # print("ignoring message of type: {}".format(message["msg"]["content"]["type"]))
+                        continue
+                    try:
+                        kb_msg = keybase.Message(id, message, config.db)
+                        scope.set_user({"username": kb_msg.author})
+                        resp = process_message(config, kb_msg, conv)
+                        if resp is None:
+                            sent_resp = True
+                        elif resp_to_send is None:
+                            resp_to_send = resp
+                    except Exception as e:
+                        sentry_sdk.capture_exception()
+                        keybase.send(id,
+                                "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
+                        if conv.debug:
+                            text = message["msg"]["content"]["text"]["body"]
+                            from_u = message["msg"]["sender"]["username"]
+                            print("Error processing message: {}".format(e.message))
+                            print("The message, sent by @" + from_u + " was: " + text, config)
+                        conv.set_context(conversation.CTX_NONE)
+                        continue
+                if not sent_resp and resp_to_send is not None:
+                    keybase.send(conv.id, resp_to_send)
+            except:
+                sentry_sdk.capture_exception()
 
 def send_reminders(config):
-    exc = None
-    for reminder in reminders.get_due_reminders(config.db):
-        try:
-            conv = Conversation.lookup(reminder.conv_id, None, config.db)
-            keybase.send(conv.id, reminder.reminder_text())
-            print("sent a reminder for", reminder.reminder_time)
-            reminder.set_next_reminder() # if it repeats
-            reminder.delete()
-            conv.set_active()
-            conv.set_context(conversation.CTX_REMINDED, reminder)
-        except Exception as e:
-            keybase.debug_crash("I crashed! Stacktrace:\n" + traceback.format_exc(), config)
-            print("Crash sending reminder to", conv.id)
-            exc = e
-    if exc != None:
-        raise exc
+    for reminder in reminders.get_due_reminders(config.db, error_limit=10):
+        with sentry_sdk.push_scope() as scope:
+            scope.user = {"username": reminder.username}
+            scope.set_tag("conv_id", reminder.conv_id)
+            try:
+                conv = Conversation.lookup(reminder.conv_id, None, config.db)
+                keybase.send(conv.id, reminder.reminder_text())
+                print("sent a reminder for", reminder.reminder_time)
+                reminder.set_next_reminder() # if it repeats
+                reminder.delete()
+                conv.set_active()
+                conv.set_context(conversation.CTX_REMINDED, reminder)
+            except Exception as e:
+                sentry_sdk.capture_exception()
+                reminder.increment_error()
 
 def vacuum_old_reminders(config):
     with sqlite3.connect(config.db) as c:
@@ -258,13 +260,14 @@ def vacuum_old_reminders(config):
     return rows
 
 class Config(object):
-    def __init__(self, db, username, owner, debug_team=None, debug_topic=None, autosend_logs=False):
+    def __init__(self, db, username, owner, debug_team=None, debug_topic=None, autosend_logs=False, sentry_dsn=None):
         self.db = db
         self.username = username
         self.owner = owner
         self.debug_team = debug_team
         self.debug_topic = debug_topic
         self.autosend_logs = autosend_logs
+        self.sentry_dsn = sentry_dsn
 
     @classmethod
     def fromFile(cls, configFile):
@@ -276,9 +279,12 @@ class Config(object):
         debug_team = config['keybase'].get('debug_team', None)
         debug_topic = config['keybase'].get('debug_topic', None)
         autosend_logs = config['keybase'].getboolean('autosend_logs', False)
-        return Config(db, username, owner, debug_team, debug_topic, autosend_logs)
+        sentry_dsn = config['sentry'].get('dsn', None)
+        return Config(db, username, owner, debug_team, debug_topic, autosend_logs, sentry_dsn)
 
 def setup(config):
+    if config.sentry_dsn:
+        sentry_sdk.init(config.sentry_dsn)
     keybase.setup(config)
     database.setup(config.db)
     import nltk
@@ -330,9 +336,7 @@ if __name__ == "__main__":
             try:
                 task(config)
             except:
-                exc_type, value, tb = sys.exc_info()
-                traceback.print_tb(tb)
-                print(str(exc_type) + ": " + str(value), file=sys.stderr)
+                sentry_sdk.capture_exception()
 
             if not running:
                 break

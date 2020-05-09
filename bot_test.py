@@ -2,9 +2,10 @@ import datetime, pytz, sqlite3, unittest
 import mock
 from mock import patch
 
-import bot, conversation, keybase, reminders, parse
+import bot, conversation, keybase, parse
 from conversation import Conversation
 from user import User
+from reminders import get_due_reminders, Reminder
 
 DB = 'test.db' # Why doesn't :memory: work?
 TEST_BOT = '__testbot__'
@@ -347,7 +348,7 @@ class TestBot(unittest.TestCase):
         list_output = "Here are your upcoming reminders:\n\n1. do something else - on Tuesday April 10 2018 at 12:00 AM\n"
         self.message_test("list", list_output, mockKeybaseSend)
         self.send_message("delete reminder #1", mockKeybaseSend)
-    
+
     def test_delete(self, mockNow, mockRandom, mockKeybaseSend):
         reminder = "remind me to foo tomorrow"
 
@@ -461,7 +462,7 @@ class TestBot(unittest.TestCase):
             mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
             bot.send_reminders(self.config)
             mockKeybaseSend.assert_called_with(TEST_CONV_ID, ":bell: *Reminder:* eat a quiche")
-        
+
         # saturday
         mockKeybaseSend.reset_mock()
         mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
@@ -536,6 +537,27 @@ class TestBot(unittest.TestCase):
         mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
         bot.send_reminders(self.config)
         assert not mockKeybaseSend.called
+
+    # Make sure it doesn't try to send a reminder after more than 10 failures
+    def test_reminder_errors(self, mockNow, mockRandom, mockKeybaseSend):
+        self.message_test(
+            "remind me to foo tomorrow", "Ok! I'll remind you to foo on Monday at 9:02 PM",
+            mockKeybaseSend,
+        )
+        mockNow.return_value = mockNow.return_value + datetime.timedelta(days=1)
+        mockKeybaseSend.side_effect = Exception("failure to send reminder")
+        bot.send_reminders(self.config)
+        rs = get_due_reminders(DB, error_limit=0)
+        assert len(rs) == 0
+        rs = get_due_reminders(DB, error_limit=1)
+        assert len(rs) == 1
+        id = rs[0].id
+        # try more than error_limit (10) times
+        for i in range(15):
+            bot.send_reminders(self.config)
+
+        r = Reminder.lookup(id, DB)
+        assert r.errors == 11
 
 
 if __name__ == '__main__':

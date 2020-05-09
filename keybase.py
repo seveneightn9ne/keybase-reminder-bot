@@ -91,15 +91,6 @@ def send(conv_id, text):
     call("send", {"options": {"conversation_id": conv_id, "message": {"body": text}}})
     return True, None
 
-def debug_crash(message, config):
-    debug(message, config)
-    if config.autosend_logs:
-        try:
-            subprocess.check_call(['keybase', 'log', 'send',
-                '--feedback', 'reminderbot crash', '--no-confirm'])
-        except subprocess.CalledProcessError:
-            print("Error during call to `keybase log send`", file=sys.stderr)
-
 def debug(message, config):
     if config.debug_team and config.debug_topic:
         call("send", {"options": {"channel": {

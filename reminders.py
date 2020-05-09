@@ -42,6 +42,7 @@ class Reminder(object):
         self.deleted = False
         self.id = None # when it's from the DB
         self.db = db
+        self.errors = 0
 
     @classmethod
     def lookup(cls, rowid, db):
@@ -61,6 +62,7 @@ class Reminder(object):
         reminder.created_time = util.from_ts(row["created_time"])
         reminder.id = row["rowid"]
         reminder.deleted = row["deleted"]
+        reminder.errors = row["errors"]
         return reminder
 
     def get_user(self):
@@ -99,6 +101,12 @@ class Reminder(object):
             c.execute('UPDATE reminders SET deleted=0, reminder_time=?, repetition_interval=?, repetition_nth=? WHERE rowid=?',
                       (util.to_ts(self.reminder_time), None, None, self.id,))
 
+    def increment_error(self):
+        assert self.id is not None
+        self.errors += 1
+        with sqlite3.connect(self.db) as c:
+            c.execute('UPDATE reminders SET errors=? WHERE rowid=?', (self.errors, self.id))
+
     def store(self):
         reminder_ts = util.to_ts(self.reminder_time) if self.reminder_time else None
         created_ts = util.to_ts(self.created_time)
@@ -112,8 +120,9 @@ class Reminder(object):
                 conv_id,
                 deleted,
                 repetition_interval,
-                repetition_nth)
-                values (?,?,?,?,?,?,?,?)''', (
+                repetition_nth,
+                errors)
+                values (?,?,?,?,?,?,?,?,?)''', (
                 reminder_ts,
                 created_ts,
                 self.body,
@@ -121,7 +130,8 @@ class Reminder(object):
                 self.conv_id,
                 self.deleted,
                 self.repetition.interval,
-                self.repetition.nth))
+                self.repetition.nth,
+                self.errors))
             self.id = cur.lastrowid
 
     def human_time(self, full=False, preposition=True):
@@ -196,13 +206,13 @@ class Reminder(object):
     def reminder_text(self):
         return ":bell: *Reminder:* " + self.body
 
-def get_due_reminders(db):
+def get_due_reminders(db, error_limit):
     reminders = []
     now_ts = util.to_ts(util.now_utc())
     with sqlite3.connect(db) as c:
         c.row_factory = sqlite3.Row
         cur = c.cursor()
-        cur.execute('SELECT rowid, * FROM reminders WHERE reminder_time<=? AND deleted=0 LIMIT 100', (now_ts,))
+        cur.execute('SELECT rowid, * FROM reminders WHERE reminder_time<=? AND deleted=0 AND errors<=? LIMIT 100', (now_ts, error_limit))
         for row in cur:
             reminders.append(Reminder.from_row(row, db))
     return reminders

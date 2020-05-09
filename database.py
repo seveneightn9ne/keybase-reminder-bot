@@ -1,3 +1,4 @@
+import sentry_sdk
 import sqlite3
 import sys
 
@@ -34,10 +35,14 @@ def add_reminder_repeating(c):
     c.execute('alter table reminders add repetition_interval text')
     c.execute('alter table reminders add repetition_nth int')
 
+def add_reminder_errors(c):
+    c.execute('alter table reminders add errors int not null default 0')
+
 def setup(db):
     try:
         c = sqlite3.connect(db)
     except sqlite3.OperationalError as e:
+        sentry_sdk.capture_exception()
         print >> sys.stderr, "FATAL: Error connecting to " + db + ": " + e.message
         sys.exit(1)
 
@@ -49,6 +54,7 @@ def setup(db):
             initial_tables,
             add_reminder_deleted,
             add_reminder_repeating,
+            add_reminder_errors
         ]
     for i, migration in enumerate(migrations, start=1):
         if db_version < i:
