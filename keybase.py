@@ -82,6 +82,11 @@ def call(method, params=None, retries=0):
             raise e
 
     if "error" in j:
+        if j["error"]["message"] == "EOF" and retries < 3:
+            print("EOF error, retrying")
+            time.sleep(1)
+            return call(method, params, retries+1)
+
         print("Problem with query:", query)
         raise Exception(j["error"]["message"])
 
