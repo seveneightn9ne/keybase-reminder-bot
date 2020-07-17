@@ -43,7 +43,7 @@ def process_message_inner(config, message, conv):
             and message.bot_username != config.username \
             and not config.username in message.text \
             and not conv.is_strong_context():
-        print("Ignoring message not for me")
+        # print("Ignoring message not for me")
         return False, None
 
     # TODO need some sort of onboarding for first-time user
