@@ -221,6 +221,11 @@ def process_new_messages(config):
                         elif resp_to_send is None:
                             resp_to_send = resp
                     except Exception as e:
+                        if e.message.startswith("user is not in conversation:  uid: "):
+                            # above error happens when bot doesn't have write permission in the conv
+                            # it can be ignored
+                            # TODO: suppose you could DM the person who sent you the message to let them know
+                            continue
                         sentry_sdk.capture_exception()
                         try:
                             keybase.send(id,
