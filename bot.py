@@ -199,7 +199,13 @@ def process_new_messages(config):
                     if "error" in message:
                         if message["error"] == "Unable to decrypt chat message: message not available":
                             continue
-                        sentry_sdk.capture_exception(Exception("Reading message: {}".format(message["error"])))
+                        elif message["error"] == "This exploding message is not available, because you joined the team after it was sent":
+                            continue
+                        try:
+                            raise Exception("Reading message: {}".format(message["error"]))
+                        except:
+                            # doing it this way gets the stacktrace
+                            sentry_sdk.capture_exception()
                         continue
                     # TODO consider processing all messages together
                     if not "text" in message["msg"]["content"]:
