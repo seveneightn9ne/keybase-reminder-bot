@@ -67,9 +67,19 @@ def call(method, params=None, retries=0):
     if params is None:
         params = {}
     query = {"method": method, "params": params}
-    proc = subprocess.Popen(['keybase','chat','api'], stdin=PIPE, stdout=PIPE)
+    try:
+        proc = subprocess.Popen(['keybase','chat','api'], stdin=PIPE, stdout=PIPE)
+    except OSError as e:
+        if e.errno == 12 and retries < 3:
+            print("Out of memory: will retry `keybase chat api` call")
+            time.sleep(1)
+            return call(method, params, retries+1)
+        else:
+            raise e
+
     proc.stdin.write((json.dumps(query) + "\n").encode('utf-8'))
     proc.stdin.close()
+
     response = proc.stdout.readline()
     try:
         j = json.loads(response.decode('utf-8'))
