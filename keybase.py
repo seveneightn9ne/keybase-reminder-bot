@@ -59,6 +59,12 @@ class Message(object):
         # restricted bot member
         return self.channel_json["members_type"] != "team" and self.channel_json["name"].count(',') <= 1
 
+# Error responses indicate keybase service is restarting
+retryable_error_messages = set([
+    "EOF",
+    "dial unix /run/user/1001/keybase/keybased.sock: connect: connection refused",
+])
+
 def call(method, params=None, retries=0):
     # method: string, params: dict
     # return: dict
@@ -92,8 +98,8 @@ def call(method, params=None, retries=0):
             raise e
 
     if "error" in j:
-        if j["error"]["message"] == "EOF" and retries < 3:
-            print("EOF error, retrying")
+        if j["error"]["message"] in retryable_error_messages and retries < 3:
+            print("retrying error:", j["error"]["message"])
             time.sleep(1)
             return call(method, params, retries+1)
 
