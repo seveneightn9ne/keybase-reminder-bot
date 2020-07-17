@@ -222,8 +222,13 @@ def process_new_messages(config):
                             resp_to_send = resp
                     except Exception as e:
                         sentry_sdk.capture_exception()
-                        keybase.send(id,
+                        try:
+                            keybase.send(id,
                                 "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
+                        except:
+                            # Can happen because the original exception is that you can't send to the channel
+                            # this is just best-effort, anyway
+                            print("Ignoring error in keybase send during crash report")
                         if conv.debug:
                             text = message["msg"]["content"]["text"]["body"]
                             from_u = message["msg"]["sender"]["username"]
