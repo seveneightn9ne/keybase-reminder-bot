@@ -193,57 +193,81 @@ async def process_message(bot, config, message, conv):
     if active:
         conv.set_active()
 
-def make_message_handler(config):
-    async def message_handler(bot, event):
+def get_conv(event, config):
+    if event.conv:
+        return Conversation.lookup_or_convsummary(event.conv.id, event.conv, config.db)
+    if event.msg:
+        if not event.msg.conv_id:
+            raise RuntimeError("KbEvent msg has no conv_id")
+        if event.msg.channel:
+            return Conversation.lookup_or_convsummary(event.msg.conv_id, event.msg, config.db)
+        return Conversation.lookup(event.msg.conv_id)
+    raise RuntimeError("KbEvent has no conv or msg")
+
+class Handler:
+    def __init__(self, config):
+        self.config = config
+    async def __call__(self, bot, event):
+        config = self.config
         with sentry_sdk.push_scope() as scope:
-            scope.set_tag("conv_id", event.conv.id)
-
-            conv = Conversation.lookup_or_convsummary(event.conv.id, event.conv, config.db)
-            if conv.channel == config.debug_team:
-                # Don't do anything in the debug team
-                return
-
-            if event.error:
-                if event.error == "Unable to decrypt chat message: message not available":
-                    return
-                try:
-                    raise Exception("Reading message: {}".format(event.error))
-                except:
-                    # doing it this way gets the stacktrace
-                    sentry_sdk.capture_exception()
-                    return
-
-            if event.msg.content.type_name != chat1.MessageTypeStrings.TEXT.value:
-                # Ignore messages like edits and people joining the channel
-                return
-
-            scope.set_user({"username": event.msg.sender.username})
-
             try:
-                kb_msg = keybase.Message.from_msgsummary(conv.id, event.msg, config.db)
-                await process_message(bot, config, kb_msg, conv)
-            except Exception as e:
-                if e.message.startswith("user is not in conversation:  uid: "):
-                    # above error happens when bot doesn't have write permission in the conv
-                    # it can be ignored
-                    # TODO: suppose you could DM the person who sent you the message to let them know
+                conv = get_conv(event, config)
+                scope.set_tag("conv_id", conv.id)
+
+                if conv.channel == config.debug_team:
+                    # Don't do anything in the debug team
+                    print("Ignoring message in debug team")
                     return
-                sentry_sdk.capture_exception()
+
+                if event.error:
+                    if event.error == "Unable to decrypt chat message: message not available":
+                        return
+                    try:
+                        raise Exception("Reading message: {}".format(event.error))
+                    except:
+                        if not config.sentry_dsn:
+                            raise
+                        # doing it this way gets the stacktrace
+                        sentry_sdk.capture_exception()
+                        return
+
+                if event.msg.content.type_name != chat1.MessageTypeStrings.TEXT.value:
+                    # Ignore messages like edits and people joining the channel
+                    print("Ignoring non text message :  " + str(event.msg.content.type_name))
+                    return
+
+                scope.set_user({"username": event.msg.sender.username})
+
                 try:
-                    await keybase.send(bot, conv.id,
-                        "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
-                except:
-                    # Can happen because the original exception is that you can't send to the channel
-                    # this is just best-effort, anyway
-                    print("Ignoring error in keybase send during crash report")
-                if conv.debug:
-                    text = event.msg.content.text.body
-                    from_u = event.msg.sender.username
-                    print("Error processing message: {}".format(e.message))
-                    print("The message, sent by @" + from_u + " was: " + text, config)
-                conv.set_context(conversation.CTX_NONE)
-                return
-    return message_handler
+                    kb_msg = keybase.Message.from_msgsummary(event.msg, config.db)
+                    await process_message(bot, config, kb_msg, conv)
+                except Exception as e:
+                    if hasattr(e, 'message') and e.message.startswith("user is not in conversation:  uid: "):
+                        # above error happens when bot doesn't have write permission in the conv
+                        # it can be ignored
+                        # TODO: suppose you could DM the person who sent you the message to let them know
+                        return
+                    if not config.sentry_dsn:
+                        raise
+                    sentry_sdk.capture_exception()
+                    try:
+                        await keybase.send(bot, conv.id,
+                            "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
+                    except:
+                        # Can happen because the original exception is that you can't send to the channel
+                        # this is just best-effort, anyway
+                        print("Ignoring error in keybase send during crash report")
+                    if conv.debug:
+                        text = event.msg.content.text.body
+                        from_u = event.msg.sender.username
+                        print("Error processing message: {}".format(e.message))
+                        print("The message, sent by @" + from_u + " was: " + text, config)
+                    conv.set_context(conversation.CTX_NONE)
+                    return
+            except:
+                if not config.sentry_dsn:
+                    raise
+                sentry_sdk.capture_exception()
 
 async def send_reminders(bot, config):
     for reminder in reminders.get_due_reminders(config.db, error_limit=10):
@@ -311,8 +335,7 @@ def setup(config):
     for lib in libs:
         nltk.download(lib, quiet=True)
 
-    message_handler = make_message_handler(config)
-    return Bot(message_handler, config.username)
+    return Bot(username=config.username, handler=Handler(config))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Beep boop.')
@@ -331,37 +354,44 @@ if __name__ == "__main__":
             pass # it doesn't exist
 
     bot = setup(config)
-    asyncio.run(bot.start({}))
 
     print("ReminderBot is running...")
     print("username: " + config.username)
 
+    loop = asyncio.get_event_loop()
+
     running = True
-    def signal_handler(signal, frame):
+    async def signal_handler():
         global running
         running = False
-        asyncio.run(clear_command_advertisements(bot))
+        await clear_command_advertisements(bot)
+        loop.stop()
 
-    signal.signal(signal.SIGINT, signal_handler)
-    signal.signal(signal.SIGTERM, signal_handler)
+    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.ensure_future(signal_handler()))
+    loop.add_signal_handler(signal.SIGTERM, lambda: asyncio.ensure_future(signal_handler()))
 
-    asyncio.run(advertise_commands(bot))
+    async def listen_loop():
+        await advertise_commands(bot)
+        await bot.start({})
 
-    while running:
-        sys.stdout.flush()
-        sys.stderr.flush()
+    async def send_reminder_loop():
+        while running:
+            sys.stdout.flush()
+            sys.stderr.flush()
 
-        for task in (
-            lambda bot, config: asyncio.run(send_reminders(bot, config)),
-            vacuum_old_reminders):
             try:
-                task(bot, config)
+                await send_reminders(bot, config)
+                vacuum_old_reminders(bot, config)
             except:
                 sentry_sdk.capture_exception()
 
             if not running:
                 break
 
-        time.sleep(1)
+            await asyncio.sleep(1)
+
+    loop.run_until_complete(
+        asyncio.gather(listen_loop(), send_reminder_loop()),
+    )
 
     print("ReminderBot shut down gracefully.")

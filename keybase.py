@@ -34,23 +34,29 @@ class Message(object):
     }
         '''
     def __init__(self, conv_id, json, db):
+        print(json)
         self.text = json["msg"]["content"]["text"]["body"]
         self.author = json["msg"]["sender"]["username"]
         self.conv_id = conv_id
         self.channel_members_type =json["msg"]["channel"]["members_type"]
         self.channel_name = json["msg"]["channel"]["name"]
-        self.bot_username = json["msg"].get("bot_info", {}).get("bot_username")
+        self.bot_username = (json["msg"].get("bot_info", {}) or {}).get("bot_username")
         self.db = db
 
     @classmethod
     def from_msgsummary(cls, msg_summary, db):
-        self.text = msg_summary.content.text.body
-        self.author = msg_summary.sender.username
-        self.conv_id = msg_summary.conv_id
-        self.channel_members_type = msg_summary.channel.members_type
-        self.channel_name = msg_summary.channel.name
-        self.bot_username = msg_summary.bot_info.bot_username if msg_summary.bot_info else None
-        self.db = db
+        return Message(
+            msg_summary.conv_id,
+            {"msg": json.loads(msg_summary.to_json())},
+            db
+        )
+        # self.text = msg_summary.content.text.body
+        # self.author = msg_summary.sender.username
+        # self.conv_id = msg_summary.conv_id
+        # self.channel_members_type = msg_summary.channel.members_type
+        # self.channel_name = msg_summary.channel.name
+        # self.bot_username = msg_summary.bot_info.bot_username if msg_summary.bot_info else None
+        # self.db = db
 
     @classmethod
     def inject(cls, text, author, conv_id, channel, db):
@@ -70,22 +76,24 @@ class Message(object):
         return self.channel_members_type != "team" and self.channel_name.count(',') <= 1
 
 async def send(bot, conv_id, msg):
-    return _with_retries(lambda: bot.chat.send(conv_id, msg))
+    async def _send():
+        await bot.chat.send(conv_id, msg)
+    await _with_retries(_send)
 
 async def debug(bot, conv, message, config):
     channel = _debug_channel(config)
     if conv.debug and channel:
-        return send(bot, channel, message)
+        await send(bot, channel, message)
     else:
         print("[DEBUG]", message, file=sys.stderr)
 
 async def _with_retries(fn, retries=3):
     try:
-        return await fn()
+        await fn()
     except Exception as e:
         if retries:
             await asyncio.sleep(1)
-            return await _with_retries(fn, retries-1)
+            await _with_retries(fn, retries-1)
         else:
             raise e
 
