@@ -339,12 +339,12 @@ if __name__ == "__main__":
     def signal_handler(signal, frame):
         global running
         running = False
-        clear_command_advertisements(bot)
+        asyncio.run(clear_command_advertisements(bot))
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    advertise_commands(bot)
+    asyncio.run(advertise_commands(bot))
 
     while running:
         sys.stdout.flush()

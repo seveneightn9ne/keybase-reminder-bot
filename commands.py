@@ -1,4 +1,4 @@
-def advertise_commands(bot):
+async def advertise_commands(bot):
     remind_me_extended = """Set a reminder at a specific time. Examples:
     ```
     !remind me [when] to [what]
@@ -12,7 +12,7 @@ def advertise_commands(bot):
     ```
     !timezone GMT
     !timezone US/Pacific```"""
-    bot.chat.execute({
+    return bot.chat.execute({
         "method": "advertisecommands",
         "params": {
             "options": {
@@ -66,8 +66,8 @@ def advertise_commands(bot):
         },
     })
 
-def clear_command_advertisements(bot):
-    bot.chat.execute({
+async def clear_command_advertisements(bot):
+    return bot.chat.execute({
         "method": "clearcommands",
         "params": {},
     })
