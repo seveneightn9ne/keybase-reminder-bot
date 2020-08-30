@@ -11,3 +11,9 @@ Reminder Bot is hosted for anyone to use as
 pip3 install -r requirements.txt
 python3 bot_test.py
 ```
+
+# Running bot locally
+
+```
+python3 bot.py --config local.ini
+```
