@@ -12,7 +12,7 @@ async def advertise_commands(bot):
     ```
     !timezone GMT
     !timezone US/Pacific```"""
-    return bot.chat.execute({
+    await bot.chat.execute({
         "method": "advertisecommands",
         "params": {
             "options": {
@@ -67,7 +67,7 @@ async def advertise_commands(bot):
     })
 
 async def clear_command_advertisements(bot):
-    return bot.chat.execute({
+    await bot.chat.execute({
         "method": "clearcommands",
         "params": {},
     })
