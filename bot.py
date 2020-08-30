@@ -385,7 +385,7 @@ if __name__ == "__main__":
 
             try:
                 await send_reminders(bot, config)
-                vacuum_old_reminders(bot, config)
+                vacuum_old_reminders(config)
             except:
                 sentry_sdk.capture_exception()
 
