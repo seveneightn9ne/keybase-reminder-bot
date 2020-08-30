@@ -1,8 +1,8 @@
 # Utilities for interacting with the keybase chat api
 
-import json, subprocess, sys, time
-from subprocess import PIPE
+import asyncio, json, sys
 from user import User
+from pykeybasebot.types import chat1
 
 class Message(object):
     '''
@@ -37,9 +37,19 @@ class Message(object):
         self.text = json["msg"]["content"]["text"]["body"]
         self.author = json["msg"]["sender"]["username"]
         self.conv_id = conv_id
-        self.channel_json = json["msg"]["channel"]
+        self.channel_members_type =json["msg"]["channel"]["members_type"]
+        self.channel_name = json["msg"]["channel"]["name"]
         self.bot_username = json["msg"].get("bot_info", {}).get("bot_username")
-        self.json = json
+        self.db = db
+
+    @classmethod
+    def from_msgsummary(cls, msg_summary, db):
+        self.text = msg_summary.content.text.body
+        self.author = msg_summary.sender.username
+        self.conv_id = msg_summary.conv_id
+        self.channel_members_type = msg_summary.channel.members_type
+        self.channel_name = msg_summary.channel.name
+        self.bot_username = msg_summary.bot_info.bot_username if msg_summary.bot_info else None
         self.db = db
 
     @classmethod
@@ -57,173 +67,29 @@ class Message(object):
     def is_private_channel(self):
         # `jessk,reminderbot` or `jessk` with reminderbot as a bot or
         # restricted bot member
-        return self.channel_json["members_type"] != "team" and self.channel_json["name"].count(',') <= 1
+        return self.channel_members_type != "team" and self.channel_name.count(',') <= 1
 
-# Error responses indicate keybase service is restarting
-retryable_error_messages = set([
-    "EOF",
-    "dial unix /run/user/1001/keybase/keybased.sock: connect: connection refused",
-])
+async def send(bot, conv_id, msg):
+    return _with_retries(lambda: bot.chat.send(conv_id, msg))
 
-def call(method, params=None, retries=0):
-    # method: string, params: dict
-    # return: dict
-    #print "keybase call " + method
-    #print "will call keybase " + method
-    if params is None:
-        params = {}
-    query = {"method": method, "params": params}
-    try:
-        proc = subprocess.Popen(['keybase','chat','api'], stdin=PIPE, stdout=PIPE)
-    except OSError as e:
-        if e.errno == 12 and retries < 3:
-            print("Out of memory: will retry `keybase chat api` call")
-            time.sleep(1)
-            return call(method, params, retries+1)
-        else:
-            raise e
-
-    proc.stdin.write((json.dumps(query) + "\n").encode('utf-8'))
-    proc.stdin.close()
-
-    response = proc.stdout.readline()
-    try:
-        j = json.loads(response.decode('utf-8'))
-    except Exception as e:
-        if retries < 3:
-            print("Unable to parse json from:", response)
-            time.sleep(1)
-            return call(method, params, retries+1)
-        else:
-            raise e
-
-    if "error" in j:
-        if j["error"]["message"] in retryable_error_messages and retries < 3:
-            print("retrying error:", j["error"]["message"])
-            time.sleep(1)
-            return call(method, params, retries+1)
-
-        print("Problem with query:", query)
-        raise Exception(j["error"]["message"])
-
-    return j["result"]
-
-def send(conv_id, text):
-    call("send", {"options": {"conversation_id": conv_id, "message": {"body": text}}})
-    return True, None
-
-def debug(message, config):
-    if config.debug_team and config.debug_topic:
-        call("send", {"options": {"channel": {
-            "name": config.debug_team,
-            "members_type": "team",
-            "topic_name": config.debug_topic},
-            "message": {"body": message}}})
+async def debug(bot, conv, message, config):
+    channel = _debug_channel(config)
+    if conv.debug and channel:
+        return send(bot, channel, message)
     else:
         print("[DEBUG]", message, file=sys.stderr)
 
-def _status():
-    proc = subprocess.Popen(['keybase','status', '-j'], stdout=PIPE)
-    out, err = proc.communicate()
-    return json.loads(out.decode('utf-8'))
-
-def setup(config):
-    status = _status()
-    logged_in = status["Username"]
-    if not status["LoggedIn"]:
-        try:
-            subprocess.check_call(['keybase', 'login', config.username])
-        except subprocess.CalledProcessError:
-            print("FATAL: Error during call to `keybase login " \
-                    + config.username + "`", file=sys.stderr)
-            sys.exit(1)
-    elif not logged_in == config.username:
-        print("FATAL: Logged in to Keybase as wrong user.", file=sys.stderr)
-        print("Logged in as "+logged_in+" but expected "+config.username+". ", file=sys.stderr)
-        print("Run `keybase logout` to log them out.", file=sys.stderr)
-        sys.exit(1)
-
-
-    # Disable typing notifications
+async def _with_retries(fn, retries=3):
     try:
-        subprocess.check_call(['keybase', 'chat', 'notification-settings', '--disable-typing'])
-    except subprocess.CalledProcessError as e:
-        print("Error during disabling typing notifications", e.message, file=sys.stderr)
+        return await fn()
+    except Exception as e:
+        if retries:
+            await asyncio.sleep(1)
+            return await _with_retries(fn, retries-1)
+        else:
+            raise e
 
-    if config.debug_team and config.debug_topic:
-        try:
-            call("read", {"options": {"channel": {
-                "name": config.debug_team,
-                "members_type": "team",
-                "topic_name": config.debug_topic}}})
-        except Exception as e:
-            print("Can't read from the debug channel:", file=sys.stderr)
-            print(e.message, file=sys.stderr)
-            sys.exit(1)
-
-
-def advertise_commands():
-    remind_me_extended = """Set a reminder at a specific time. Examples:
-    ```
-    !remind me [when] to [what]
-    !remind me to [what] [when]```"""
-    delete_extended = """Examples:
-    ```
-    !delete the reminder to [what]
-    !delete the [when] reminder
-    !delete reminder #2```"""
-    tz_extended = """Set your timezone to [tz]. This changes when any upcoming reminders will happen. Examples:
-    ```
-    !timezone GMT
-    !timezone US/Pacific```"""
-    call("advertisecommands", {"options": {
-        "alias": "Reminder Bot",
-        "advertisements": [{
-            "type": "public",
-            "commands": [
-                    {
-                    "name": "help",
-                    "description": "See help with available commands.",
-                    },
-                    {
-                    "name": "remind me",
-                    "description": "Set a reminder.",
-                    "extended_description": {
-                            "title": "*!remind me*",
-                            "desktop_body": remind_me_extended,
-                            "mobile_body": remind_me_extended,
-                        }
-                    },
-                    {
-                    "name": "list",
-                    "description": "Show upcoming reminders.",
-                    },
-                    {
-                    "name": "delete",
-                    "description": "Delete a reminder.",
-                    "extended_description": {
-                            "title": "*!delete*",
-                            "desktop_body": delete_extended,
-                            "mobile_body": delete_extended,
-                        }
-                    },
-                    {
-                    "name": "timezone",
-                    "description": "Set your timezone.",
-                    "extended_description": {
-                            "title": "*!timezone*",
-                            "desktop_body": tz_extended,
-                            "mobile_body": tz_extended,
-                        }
-                    },
-                    {
-                    "name": "source",
-                    "description": "Learn about my beginnings.",
-                    },
-                ],
-            }],
-        }
-    })
-
-def clear_command_advertisements():
-    call("clearcommands")
+def _debug_channel(config):
+    if not config.debug_team or not config.debug_topic:
+        return None
+    return chat1.ChatChannel(name=config.debug_team, members_type="team",topic_name=config.debug_topic)

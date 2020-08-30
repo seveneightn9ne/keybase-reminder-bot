@@ -7,6 +7,8 @@ Reminder Bot is hosted for anyone to use as
 
 # Running tests
 
+Requires Python 3.8+
+
 ```
 pip3 install -r requirements.txt
 python3 bot_test.py

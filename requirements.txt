@@ -3,4 +3,6 @@ configparser
 dateparser
 mock
 nltk
+pykeybasebot
+pytz
 sentry-sdk

@@ -1,8 +1,15 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.8
 
-import argparse, configparser, os, pytz, sentry_sdk, signal, sqlite3, subprocess, sys, time, traceback
+import argparse, asyncio, configparser, logging, os, pytz, sentry_sdk, signal, sqlite3, sys, time, traceback
+
+from pykeybasebot import Bot
+from pykeybasebot.types import chat1
+
+from commands import advertise_commands, clear_command_advertisements
 import conversation, database, keybase, parse, reminders, util
 from conversation import Conversation
+
+logging.basicConfig(level=logging.DEBUG)
 
 # Static response messages
 HELP_WHEN = "Sorry, I didn't understand. When should I set the reminder for?" \
@@ -38,20 +45,20 @@ DEBUG = "Thanks! Now I'll log verbose error messages in this conversation. say #
 NODEBUG = "Ok! Debug mode is off now."
 
 # Returns True iff I interacted with the user.
-def process_message_inner(config, message, conv):
+async def process_message_inner(bot, config, message, conv):
     if not message.is_private_channel() \
             and message.bot_username != config.username \
             and not config.username in message.text \
             and not conv.is_strong_context():
         # print("Ignoring message not for me")
-        return False, None
+        return False
 
     # TODO need some sort of onboarding for first-time user
 
     msg_type, data = parse.parse_message(message, conv, config)
     print("Received message parsed as " + str(msg_type) + " in context " + str(conv.context))
     if msg_type == parse.MSG_REMINDER and message.user().timezone is None:
-        keybase.send(conv.id, ASSUME_TZ)
+        await keybase.send(bot, conv.id, ASSUME_TZ)
         message.user().set_timezone("US/Eastern")
 
     if msg_type == parse.MSG_REMINDER:
@@ -59,43 +66,52 @@ def process_message_inner(config, message, conv):
         reminder.store()
         if not reminder.reminder_time:
             conv.set_context(conversation.CTX_WHEN, reminder=reminder)
-            return keybase.send(conv.id, WHEN)
+            await keybase.send(bot, conv.id, WHEN)
+            return True
         else:
             conv.set_context(conversation.CTX_SET, reminder=reminder)
-            return keybase.send(conv.id, reminder.confirmation())
+            await keybase.send(bot, conv.id, reminder.confirmation())
+            return True
 
     elif msg_type == parse.MSG_STFU:
         conv.clear_context()
-        return keybase.send(conv.id, OK)
+        await keybase.send(bot, conv.id, OK)
+        return True
 
     elif msg_type == parse.MSG_HELP:
         message.user().set_seen_help()
         conv.clear_weak_context()
-        return keybase.send(conv.id, HELP % config.owner)
+        await keybase.send(bot, conv.id, HELP % config.owner)
+        return True
 
     elif msg_type == parse.MSG_TIMEZONE:
         message.user().set_timezone(data)
         if conv.context == conversation.CTX_WHEN:
-            return keybase.send(conv.id, ACK_WHEN)
+            await keybase.send(bot, conv.id, ACK_WHEN)
+            return True
         conv.clear_weak_context()
-        return keybase.send(conv.id, ACK)
+        await keybase.send(bot, conv.id, ACK)
+        return True
 
     elif msg_type == parse.MSG_WHEN:
         reminder = conv.get_reminder()
         reminder.set_time(data[0], data[1])
         confirmation = reminder.confirmation()
         conv.set_context(conversation.CTX_SET, reminder=reminder)
-        return keybase.send(conv.id, confirmation)
+        await keybase.send(bot, conv.id, confirmation)
+        return True
 
     elif msg_type == parse.MSG_LIST:
         reminders = conv.get_all_reminders()
         conv.clear_weak_context()
         if not len(reminders):
-            return keybase.send(conv.id, NO_REMINDERS)
+            await keybase.send(bot, conv.id, NO_REMINDERS)
+            return True
         response = LIST_INTRO
         for i, reminder in enumerate(reminders, start=1):
             response += str(i) + ". " + reminder.body + " - " + reminder.human_time(full=True) + "\n"
-        return keybase.send(conv.id, response)
+        await keybase.send(bot, conv.id, response)
+        return True
 
     elif msg_type == parse.MSG_UNDO:
         if conv.context == conversation.CTX_SET:
@@ -103,31 +119,37 @@ def process_message_inner(config, message, conv):
         elif conv.context == conversation.CTX_DELETED:
             conv.get_reminder().undelete()
         conv.clear_weak_context()
-        return keybase.send(conv.id, OK)
+        await keybase.send(bot, conv.id, OK)
+        return True
 
     elif msg_type == parse.MSG_SOURCE:
         conv.clear_weak_context()
-        return keybase.send(conv.id, SOURCE)
+        await keybase.send(bot, conv.id, SOURCE)
+        return True
 
     elif msg_type == parse.MSG_UNKNOWN_TZ:
         conv.clear_weak_context()
-        return keybase.send(conv.id, HELP_TZ)
+        await keybase.send(bot, conv.id, HELP_TZ)
+        return True
 
     elif msg_type == parse.MSG_ACK:
         conv.clear_weak_context()
-        return True, None
+        return True
 
     elif msg_type == parse.MSG_GREETING:
         conv.clear_weak_context()
-        return keybase.send(conv.id, data)
+        await keybase.send(bot, conv.id, data)
+        return True
 
     elif msg_type == parse.MSG_DEBUG:
         conv.set_debug(True)
-        return keybase.send(conv.id, DEBUG)
+        await keybase.send(bot, conv.id, DEBUG)
+        return True
 
     elif msg_type == parse.MSG_NODEBUG:
         conv.set_debug(False)
-        return keybase.send(conv.id, NODEBUG)
+        await keybase.send(bot, conv.id, NODEBUG)
+        return True
 
     elif msg_type == parse.MSG_DELETE:
         reminder = data
@@ -135,125 +157,102 @@ def process_message_inner(config, message, conv):
         conv.set_context(conversation.CTX_DELETED, reminder)
         msg = "Alright, I've deleted the reminder to " + reminder.body + " that was set for " + \
             reminder.human_time(preposition=False) + "."
-        return keybase.send(conv.id, msg)
+        await keybase.send(bot, conv.id, msg)
+        return True
 
     elif msg_type == parse.MSG_SNOOZE:
         if conv.context != conversation.CTX_REMINDED:
-            return keybase.send(conv.id, "Not sure what to snooze.")
+            await keybase.send(bot, conv.id, "Not sure what to snooze.")
+            return True
         conv.get_reminder().snooze_until(data.time)
         conv.set_context(conversation.CTX_SET, conv.get_reminder())
-        return keybase.send(conv.id, "Ok. I'll remind you again in " + data.phrase + ".")
+        await keybase.send(bot, conv.id, "Ok. I'll remind you again in " + data.phrase + ".")
+        return True
 
     elif msg_type == parse.MSG_UNKNOWN:
         # I don't think an unknown message should clear context at all
         #conv.clear_weak_context()
-        if conv.debug:
-            keybase.debug("Message from @" + message.user().name + " parsed UNKNOWN: " \
-                    + message.text, config)
+        await keybase.debug(bot, conv, "Message from @" + message.user().name + " parsed UNKNOWN: " \
+                + message.text, config)
         if conv.context == conversation.CTX_WHEN:
-            return True, HELP_WHEN
+            await keybase.send(bot, conv.id, HELP_WHEN)
+            return True
         else: # CTX_NONE/weak
             if conv.is_recently_active() or message.user().has_seen_help:
-                return True, UNKNOWN
-            return True, PROMPT_HELP
+                await keybase.send(bot, conv.id, UNKNOWN)
+                return True
+            await keybase.send(bot, conv.id, PROMPT_HELP)
+            return True
 
     # Shouldn't be able to get here
     print(msg_type, data)
     assert False, "unexpected parsed msg_type"
 
-def process_message(config, message, conv):
-    active, unknown_msg = process_message_inner(config, message, conv)
+async def process_message(bot, config, message, conv):
+    active = await process_message_inner(bot, config, message, conv)
     if active:
         conv.set_active()
-    return unknown_msg
 
-def process_new_messages(config):
-    params = {"options": {
-        "unread_only": True}}
-    results = keybase.call("list", params)
-    all_convs = results["conversations"]
-
-    if not all_convs:
-        return
-
-    unread_convs = [conv for conv in all_convs if conv["unread"]]
-    # print str(len(unread_convs)) + " unread conversations"
-
-    for conv_json in unread_convs:
+def make_message_handler(config):
+    async def message_handler(bot, event):
         with sentry_sdk.push_scope() as scope:
-            try:
-                id = conv_json["id"]
-                scope.set_tag("conv_id", id)
-                conv = Conversation.lookup(id, conv_json, config.db)
-                if conv.channel == config.debug_team:
-                    # Don't do anything in the debug team
-                    continue
-                params = {"options": {
-                        "conversation_id": id,
-                        "unread_only": True}}
-                response = keybase.call("read", params)
-                #print "other response", response
-                sent_resp = False
-                resp_to_send = None
-                for message in reversed(response["messages"]):
-                    if "error" in message:
-                        if message["error"] == "Unable to decrypt chat message: message not available":
-                            continue
-                        elif message["error"] == "This exploding message is not available, because you joined the team after it was sent":
-                            continue
-                        try:
-                            raise Exception("Reading message: {}".format(message["error"]))
-                        except:
-                            # doing it this way gets the stacktrace
-                            sentry_sdk.capture_exception()
-                        continue
-                    # TODO consider processing all messages together
-                    if not "text" in message["msg"]["content"]:
-                        # Ignore messages like edits and people joining the channel
-                        # print("ignoring message of type: {}".format(message["msg"]["content"]["type"]))
-                        continue
-                    try:
-                        kb_msg = keybase.Message(id, message, config.db)
-                        scope.set_user({"username": kb_msg.author})
-                        resp = process_message(config, kb_msg, conv)
-                        if resp is None:
-                            sent_resp = True
-                        elif resp_to_send is None:
-                            resp_to_send = resp
-                    except Exception as e:
-                        if e.message.startswith("user is not in conversation:  uid: "):
-                            # above error happens when bot doesn't have write permission in the conv
-                            # it can be ignored
-                            # TODO: suppose you could DM the person who sent you the message to let them know
-                            continue
-                        sentry_sdk.capture_exception()
-                        try:
-                            keybase.send(id,
-                                "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
-                        except:
-                            # Can happen because the original exception is that you can't send to the channel
-                            # this is just best-effort, anyway
-                            print("Ignoring error in keybase send during crash report")
-                        if conv.debug:
-                            text = message["msg"]["content"]["text"]["body"]
-                            from_u = message["msg"]["sender"]["username"]
-                            print("Error processing message: {}".format(e.message))
-                            print("The message, sent by @" + from_u + " was: " + text, config)
-                        conv.set_context(conversation.CTX_NONE)
-                        continue
-                if not sent_resp and resp_to_send is not None:
-                    keybase.send(conv.id, resp_to_send)
-            except:
-                sentry_sdk.capture_exception()
+            scope.set_tag("conv_id", event.conv.id)
 
-def send_reminders(config):
+            conv = Conversation.lookup_or_convsummary(event.conv.id, event.conv, config.db)
+            if conv.channel == config.debug_team:
+                # Don't do anything in the debug team
+                return
+
+            if event.error:
+                if event.error == "Unable to decrypt chat message: message not available":
+                    return
+                try:
+                    raise Exception("Reading message: {}".format(event.error))
+                except:
+                    # doing it this way gets the stacktrace
+                    sentry_sdk.capture_exception()
+                    return
+
+            if event.msg.content.type_name != chat1.MessageTypeStrings.TEXT.value:
+                # Ignore messages like edits and people joining the channel
+                return
+
+            scope.set_user({"username": event.msg.sender.username})
+
+            try:
+                kb_msg = keybase.Message.from_msgsummary(conv.id, event.msg, config.db)
+                await process_message(bot, config, kb_msg, conv)
+            except Exception as e:
+                if e.message.startswith("user is not in conversation:  uid: "):
+                    # above error happens when bot doesn't have write permission in the conv
+                    # it can be ignored
+                    # TODO: suppose you could DM the person who sent you the message to let them know
+                    return
+                sentry_sdk.capture_exception()
+                try:
+                    await keybase.send(bot, conv.id,
+                        "Ugh! I crashed! I sent the error to @" + config.owner + " to fix.")
+                except:
+                    # Can happen because the original exception is that you can't send to the channel
+                    # this is just best-effort, anyway
+                    print("Ignoring error in keybase send during crash report")
+                if conv.debug:
+                    text = event.msg.content.text.body
+                    from_u = event.msg.sender.username
+                    print("Error processing message: {}".format(e.message))
+                    print("The message, sent by @" + from_u + " was: " + text, config)
+                conv.set_context(conversation.CTX_NONE)
+                return
+    return message_handler
+
+async def send_reminders(bot, config):
     for reminder in reminders.get_due_reminders(config.db, error_limit=10):
         with sentry_sdk.push_scope() as scope:
             scope.user = {"username": reminder.username}
             scope.set_tag("conv_id", reminder.conv_id)
             try:
-                conv = Conversation.lookup(reminder.conv_id, None, config.db)
-                keybase.send(conv.id, reminder.reminder_text())
+                conv = Conversation.lookup(reminder.conv_id, config.db)
+                await keybase.send(bot, conv.id, reminder.reminder_text())
                 print("sent a reminder for", reminder.reminder_time)
                 reminder.set_next_reminder() # if it repeats
                 reminder.delete()
@@ -306,12 +305,14 @@ class Config(object):
 def setup(config):
     if config.sentry_dsn:
         sentry_sdk.init(config.sentry_dsn)
-    keybase.setup(config)
     database.setup(config.db)
     import nltk
     libs = ('punkt', 'averaged_perceptron_tagger', 'universal_tagset')
     for lib in libs:
         nltk.download(lib, quiet=True)
+
+    message_handler = make_message_handler(config)
+    return Bot(message_handler, config.username)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Beep boop.')
@@ -329,7 +330,7 @@ if __name__ == "__main__":
         except OSError:
             pass # it doesn't exist
 
-    setup(config)
+    bot = setup(config)
 
     print("ReminderBot is running...")
     print("username: " + config.username)
@@ -338,24 +339,22 @@ if __name__ == "__main__":
     def signal_handler(signal, frame):
         global running
         running = False
-        keybase.clear_command_advertisements()
+        clear_command_advertisements(bot)
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-
-    keybase.advertise_commands()
+    advertise_commands(bot)
 
     while running:
         sys.stdout.flush()
         sys.stderr.flush()
 
         for task in (
-            process_new_messages,
             send_reminders,
             vacuum_old_reminders):
             try:
-                task(config)
+                task(bot, config)
             except:
                 sentry_sdk.capture_exception()
 

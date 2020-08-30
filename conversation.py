@@ -2,6 +2,8 @@
 
 import sqlite3, time
 
+from pykeybasebot.types import chat1
+
 import util
 from reminders import Reminder
 
@@ -27,7 +29,31 @@ class Conversation(object):
         self.db = db
 
     @classmethod
-    def lookup(cls, id, conv_json, db):
+    def lookup_or_json(cls, id, conv_json, db):
+        def initializer(conv):
+            assert conv_json is not None
+            conv.channel = conv_json["channel"]["name"]
+            conv.is_team = conv_json["channel"]["members_type"] == "team"
+            conv.topic = conv_json["channel"]["topic_name"] \
+                    if "topic_name" in conv_json["channel"] else None
+        return Conversation._lookup(id, initializer, db)
+
+    @classmethod
+    def lookup_or_convsummary(cls, id, conv_summary, db):
+        def initializer(conv):
+            conv.channel = conv_summary.channel.name
+            conv.is_team = conv_summary.channel.members_type == chat1.ConversationMembersTypeStrings.TEAM
+            conv.topic = conv_summary.channel.topic_name or None
+        return Conversation._lookup(id, initializer, db)
+
+    @classmethod
+    def lookup(cls, id, db):
+        def initializer(conv):
+            raise RuntimeError('Conversation is not in db')
+        return Conversation._lookup(id, initializer, db)
+
+    @classmethod
+    def _lookup(cls, id, initializer, db):
         conv = Conversation(id, db)
         with sqlite3.connect(db) as c:
             cur = c.cursor()
@@ -41,11 +67,7 @@ class Conversation(object):
                 topic from conversations where id=?''', (id,))
             row = cur.fetchone()
         if row is None:
-            assert conv_json is not None
-            conv.channel = conv_json["channel"]["name"]
-            conv.is_team = conv_json["channel"]["members_type"] == "team"
-            conv.topic = conv_json["channel"]["topic_name"] \
-                    if "topic_name" in conv_json["channel"] else None
+            initializer(conv)
             conv.store()
             return conv
         conv.last_active_time = util.from_ts(row[0])
