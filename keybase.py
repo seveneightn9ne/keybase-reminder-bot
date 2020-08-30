@@ -34,7 +34,6 @@ class Message(object):
     }
         '''
     def __init__(self, conv_id, json, db):
-        print(json)
         self.text = json["msg"]["content"]["text"]["body"]
         self.author = json["msg"]["sender"]["username"]
         self.conv_id = conv_id
