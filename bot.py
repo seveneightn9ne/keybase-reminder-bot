@@ -236,6 +236,10 @@ class Handler:
                     print("Ignoring non text message :  " + str(event.msg.content.type_name))
                     return
 
+                if event.msg.sender.username == config.username:
+                    # Don't process my own messaages
+                    return
+
                 scope.set_user({"username": event.msg.sender.username})
 
                 try:
