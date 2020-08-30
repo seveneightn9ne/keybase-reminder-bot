@@ -351,7 +351,7 @@ if __name__ == "__main__":
         sys.stderr.flush()
 
         for task in (
-            send_reminders,
+            lambda bot, config: asyncio.run(send_reminders(bot, config)),
             vacuum_old_reminders):
             try:
                 task(bot, config)
