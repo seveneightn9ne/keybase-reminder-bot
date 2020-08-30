@@ -9,7 +9,7 @@ from commands import advertise_commands, clear_command_advertisements
 import conversation, database, keybase, parse, reminders, util
 from conversation import Conversation
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 # Static response messages
 HELP_WHEN = "Sorry, I didn't understand. When should I set the reminder for?" \
