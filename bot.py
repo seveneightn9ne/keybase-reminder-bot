@@ -331,6 +331,7 @@ if __name__ == "__main__":
             pass # it doesn't exist
 
     bot = setup(config)
+    asyncio.run(bot.start({}))
 
     print("ReminderBot is running...")
     print("username: " + config.username)
