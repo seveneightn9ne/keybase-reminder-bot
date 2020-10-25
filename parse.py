@@ -407,6 +407,17 @@ def try_parse_snooze(text, user, config):
         return SnoozeData(phrase, t)
 
 def parse_message(message, conv, config):
+    message.text = message.text.strip()
+
+    # drop a mention at the beginning or end
+    # users mention reminderbot in teams to make sure it gets the message.
+    # e.g. "@reminderbot nevermind" -> "nevermind"
+    # e.g. "nevermind @reminderbot" -> "nevermind"
+    at_mention = f"@{config.username}"
+    if message.text.lower().startswith(at_mention):
+        message.text = message.text[len(at_mention):].strip()
+    if message.text.lower().endswith(f"@{config.username}"):
+        message.text = message.text[:-len(at_mention)].strip()
 
     # convert an advertisement command to a regular message
     if message.text.startswith("!"):
