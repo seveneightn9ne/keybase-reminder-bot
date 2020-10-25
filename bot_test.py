@@ -273,6 +273,13 @@ class TestBot(unittest.IsolatedAsyncioTestCase):
         await bot.send_reminders(self.bot, self.config)
         mockKeybaseSend.assert_called_with(self.bot, TEST_CONV_ID, bot.OK) # no reminder sent
 
+    async def test_context_strip(self, mockNow, mockRandom, mockKeybaseSend):
+        await self.message_test(
+                "remind me to x",
+                "When do you want to be reminded?",
+                 mockKeybaseSend)
+        await self.message_test(f"@{TEST_BOT} in 1 second", "Ok! I'll remind you to x at 9:02 PM", mockKeybaseSend)
+
     async def snooze_test(self, mockNow, mockKeybaseSend, phrase, echo, duration):
         reminder = "get groceries"
         await self.reminder_test(

@@ -14,6 +14,11 @@ pip3 install -r requirements.txt
 python3 bot_test.py
 ```
 
+To run a single test:
+```
+python3 bot_test.py TestBot.test_undo
+```
+
 # Running bot locally
 
 ```
