@@ -280,7 +280,7 @@ async def send_reminders(bot, config):
             scope.set_tag("conv_id", reminder.conv_id)
             try:
                 conv = Conversation.lookup(reminder.conv_id, config.db)
-                await keybase.send(bot, conv.id, reminder.reminder_text())
+                await keybase.send(bot, conv.id, reminder.reminder_text(conv))
                 print("sent a reminder for", reminder.reminder_time)
                 reminder.set_next_reminder() # if it repeats
                 reminder.delete()

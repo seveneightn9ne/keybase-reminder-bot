@@ -62,4 +62,3 @@ def setup(db):
 
     cur.execute('pragma user_version = ' + str(len(migrations)))
     c.commit()
-

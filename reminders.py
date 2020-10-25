@@ -37,7 +37,7 @@ class Reminder(object):
         self.created_time = util.now_utc()
         self.body = body
         self.repetition = repetition if repetition else Repetition(None, None)
-        self.username = username
+        self.username = username # user who requested the reminder
         self.conv_id = conv_id
         self.deleted = False
         self.id = None # when it's from the DB
@@ -203,8 +203,11 @@ class Reminder(object):
     def confirmation(self):
         return random.choice(OK) + " I'll remind you to " + self.body + " " + self.human_time()
 
-    def reminder_text(self):
-        return ":bell: *Reminder:* " + self.body
+    def reminder_text(self, conv):
+        mention = ""
+        if should_mention:
+            mention = f" {self.username}"
+        return f":bell: *Reminder{mention}:* {self.body}"
 
 def get_due_reminders(db, error_limit):
     reminders = []
